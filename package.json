@@ -1,0 +1,52 @@
+{
+    "name": "vue2-ts-decorator",
+    "displayName": "vue2-ts-decorator",
+    "description": "Support Vue2's Typescript decorator-style plugin.",
+    "version": "0.1.0",
+    "publisher": "ren-wei",
+    "license": "MIT",
+    "keywords": [
+        "vue",
+        "vue2",
+        "ts",
+        "typescript",
+        "decorator"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ren-wei/vue2-ts-decorator"
+    },
+    "bugs": {
+        "url": "https://github.com/ren-wei/vue2-ts-decorator/issues",
+        "email": "demonre@foxmail.com"
+    },
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "activationEvents": [
+        "onLanguage:typescript",
+        "onLanguage:vue"
+    ],
+    "main": "./client/out/extension",
+    "contributes": {},
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -b",
+        "watch": "tsc -b -w",
+        "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
+        "postinstall": "cd client && yarn install && cd ../server && yarn install && cd ..",
+        "test": "sh ./scripts/e2e.sh"
+    },
+    "devDependencies": {
+        "@types/mocha": "^9.1.0",
+        "@types/node": "^16.11.7",
+        "@typescript-eslint/eslint-plugin": "^5.42.0",
+        "@typescript-eslint/parser": "^5.42.0",
+        "eslint": "^8.26.0",
+        "mocha": "^9.2.1",
+        "typescript": "^4.9.4"
+    }
+}
