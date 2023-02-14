@@ -9,13 +9,18 @@
 			"name": "Run Extension",
 			"type": "extensionHost",
 			"request": "launch",
+			"autoAttachChildProcesses": true,
+			"runtimeExecutable": "${execPath}",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}"
+				"--extensionDevelopmentPath=${workspaceRoot}"
 			],
 			"outFiles": [
-				"${workspaceFolder}/dist/**/*.js"
+				"${workspaceRoot}/client/out/**/*.js"
 			],
-			"preLaunchTask": "${defaultBuildTask}"
+			"preLaunchTask": {
+				"type": "npm",
+				"script": "compile"
+			}
 		},
 		{
 			"name": "Extension Tests",
