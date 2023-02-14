@@ -27,11 +27,26 @@
         "Programming Languages"
     ],
     "activationEvents": [
-        "onLanguage:typescript",
-        "onLanguage:vue"
+        "onLanguage:typescript"
     ],
     "main": "./client/out/extension",
-    "contributes": {},
+    "contributes": {
+        "languages": [
+            {
+                "id": "vue",
+                "extensions": [
+                    ".vue"
+                ]
+            }
+        ],
+        "grammars": [
+            {
+                "language": "vue",
+                "scopeName": "source.vue",
+                "path": "./syntaxes/vue.tmLanguage.json"
+            }
+        ]
+    },
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -b",
