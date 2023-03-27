@@ -15,6 +15,7 @@ import {
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { getLanguageService as getHtmlLanguageService, ColorPresentation } from 'vscode-html-languageservice';
+import { capabilities } from './config';
 
 const htmlLanguageService = getHtmlLanguageService();
 
@@ -25,106 +26,23 @@ const connection = createConnection(ProposedFeatures.all);
 // Create a simple text document manager.
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
-let hasConfigurationCapability = false;
-let hasWorkspaceFolderCapability = false;
-let hasDiagnosticRelatedInformationCapability = false;
-
 connection.onInitialize((params: InitializeParams) => {
-    const capabilities = params.capabilities;
-
-    // Does the client support the `workspace/configuration` request?
-    // If not, we fall back using global settings.
-    hasConfigurationCapability = !!(
-        capabilities.workspace && !!capabilities.workspace.configuration
-    );
-    hasWorkspaceFolderCapability = !!(
-        capabilities.workspace && !!capabilities.workspace.workspaceFolders
-    );
-    hasDiagnosticRelatedInformationCapability = !!(
-        capabilities.textDocument
-		&& capabilities.textDocument.publishDiagnostics
-		&& capabilities.textDocument.publishDiagnostics.relatedInformation
-    );
-
     const result: InitializeResult = {
-        capabilities: {
-            textDocumentSync: TextDocumentSyncKind.Incremental,
-            completionProvider: {
-                resolveProvider: true,
-            },
-            hoverProvider: true,
-            documentSymbolProvider: true,
-        },
+        capabilities,
     };
-    if (hasWorkspaceFolderCapability) {
-        result.capabilities.workspace = {
-            workspaceFolders: {
-                supported: true,
-            },
-        };
-    }
     return result;
 });
 
 connection.onInitialized(() => {
-    connection.console.log('Initialized');
-    if (hasConfigurationCapability) {
-        // Register for all configuration changes.
-        connection.client.register(DidChangeConfigurationNotification.type, undefined);
-    }
-    if (hasWorkspaceFolderCapability) {
-        connection.workspace.onDidChangeWorkspaceFolders(event => {
-            connection.console.log('Workspace folder change event received.');
-        });
-    }
+    connection.client.register(DidChangeConfigurationNotification.type, undefined);
+    connection.workspace.onDidChangeWorkspaceFolders(event => {
+        connection.console.log('Workspace folder change event received.');
+    });
 });
-
-// The example settings
-interface ExampleSettings {
-    maxNumberOfProblems: number;
-}
-
-// The global settings, used when the `workspace/configuration` request is not supported by the client.
-// Please note that this is not the case when using this server with the client provided in this example
-// but could happen with other clients.
-const defaultSettings: ExampleSettings = { maxNumberOfProblems: 1000 };
-let globalSettings: ExampleSettings = defaultSettings;
-
-// Cache the settings of all open documents
-const documentSettings: Map<string, Thenable<ExampleSettings>> = new Map();
 
 connection.onDidChangeConfiguration(change => {
-    if (hasConfigurationCapability) {
-        // Reset all cached document settings
-        documentSettings.clear();
-    } else {
-        globalSettings = <ExampleSettings>(
-			(change.settings.languageServerExample || defaultSettings)
-		);
-    }
-
     // Revalidate all open text documents
     documents.all().forEach(validateTextDocument);
-});
-
-function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
-    if (!hasConfigurationCapability) {
-        return Promise.resolve(globalSettings);
-    }
-    let result = documentSettings.get(resource);
-    if (!result) {
-        result = connection.workspace.getConfiguration({
-            scopeUri: resource,
-            section: 'languageServerExample',
-        });
-        documentSettings.set(resource, result);
-    }
-    return result;
-}
-
-// Only keep settings for open documents
-documents.onDidClose(e => {
-    documentSettings.delete(e.document.uri);
 });
 
 // The content of a text document has changed. This event is emitted
@@ -134,9 +52,6 @@ documents.onDidChangeContent(change => {
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-    // In this simple example we get the settings for every validate run.
-    const settings = await getDocumentSettings(textDocument.uri);
-
     // The validator creates diagnostics for all uppercase words length 2 and more
     const text = textDocument.getText();
     const pattern = /\b[A-Z]{2,}\b/g;
@@ -144,7 +59,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
     let problems = 0;
     const diagnostics: Diagnostic[] = [];
-    while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
+    while ((m = pattern.exec(text))) {
         problems++;
         const diagnostic: Diagnostic = {
             severity: DiagnosticSeverity.Warning,
@@ -155,24 +70,22 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
             message: `${m[0]} is all uppercase.`,
             source: 'ex',
         };
-        if (hasDiagnosticRelatedInformationCapability) {
-            diagnostic.relatedInformation = [
-                {
-                    location: {
-                        uri: textDocument.uri,
-                        range: Object.assign({}, diagnostic.range),
-                    },
-                    message: 'Spelling matters',
+        diagnostic.relatedInformation = [
+            {
+                location: {
+                    uri: textDocument.uri,
+                    range: Object.assign({}, diagnostic.range),
                 },
-                {
-                    location: {
-                        uri: textDocument.uri,
-                        range: Object.assign({}, diagnostic.range),
-                    },
-                    message: 'Particularly for names',
+                message: 'Spelling matters',
+            },
+            {
+                location: {
+                    uri: textDocument.uri,
+                    range: Object.assign({}, diagnostic.range),
                 },
-            ];
-        }
+                message: 'Particularly for names',
+            },
+        ];
         diagnostics.push(diagnostic);
     }
 
@@ -186,13 +99,11 @@ connection.onDidChangeWatchedFiles(change => {
 });
 
 connection.onDocumentSymbol((params) => {
-    connection.console.log('onDocumentSymbol');
     const document = documents.get(params.textDocument.uri);
     if (!document) {
         return [];
     }
     const htmlDocument = htmlLanguageService.parseHTMLDocument(document);
-    connection.console.log(JSON.stringify(htmlLanguageService.findDocumentSymbols(document, htmlDocument)));
     return htmlLanguageService.findDocumentSymbols(document, htmlDocument);
 });
 
@@ -203,7 +114,6 @@ connection.onDocumentHighlight((params, token, workDoneProgress, resultProgress)
     }
     const htmlDocument = htmlLanguageService.parseHTMLDocument(document);
     const result = htmlLanguageService.findDocumentHighlights(document, params.position, htmlDocument);
-    connection.console.log(JSON.stringify(result));
     return result;
 });
 
