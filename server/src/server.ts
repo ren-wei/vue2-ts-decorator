@@ -1,30 +1,23 @@
 import {
     createConnection,
-    TextDocuments,
-    Diagnostic,
-    DiagnosticSeverity,
     ProposedFeatures,
     InitializeParams,
     DidChangeConfigurationNotification,
     CompletionItem,
     TextDocumentPositionParams,
-    TextDocumentSyncKind,
     InitializeResult,
-    Range,
 } from 'vscode-languageserver/node';
 
-import { TextDocument } from 'vscode-languageserver-textdocument';
-import { getLanguageService as getHtmlLanguageService, ColorPresentation } from 'vscode-html-languageservice';
+import { getLanguageService as getHtmlLanguageService } from 'vscode-html-languageservice';
 import { capabilities } from './config';
+import documents from './documents';
+import { validateTextDocument } from './validate';
 
 const htmlLanguageService = getHtmlLanguageService();
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 const connection = createConnection(ProposedFeatures.all);
-
-// Create a simple text document manager.
-const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 connection.onInitialize((params: InitializeParams) => {
     const result: InitializeResult = {
@@ -45,57 +38,13 @@ connection.onDidChangeConfiguration(change => {
     documents.all().forEach(validateTextDocument);
 });
 
-// The content of a text document has changed. This event is emitted
-// when the text document first opened or when its content has changed.
-documents.onDidChangeContent(change => {
-    validateTextDocument(change.document);
+connection.onDidChangeTextDocument((change) => {
+    console.log('onDidChangeTextDocument');
 });
-
-async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-    // The validator creates diagnostics for all uppercase words length 2 and more
-    const text = textDocument.getText();
-    const pattern = /\b[A-Z]{2,}\b/g;
-    let m: RegExpExecArray | null;
-
-    let problems = 0;
-    const diagnostics: Diagnostic[] = [];
-    while ((m = pattern.exec(text))) {
-        problems++;
-        const diagnostic: Diagnostic = {
-            severity: DiagnosticSeverity.Warning,
-            range: {
-                start: textDocument.positionAt(m.index),
-                end: textDocument.positionAt(m.index + m[0].length),
-            },
-            message: `${m[0]} is all uppercase.`,
-            source: 'ex',
-        };
-        diagnostic.relatedInformation = [
-            {
-                location: {
-                    uri: textDocument.uri,
-                    range: Object.assign({}, diagnostic.range),
-                },
-                message: 'Spelling matters',
-            },
-            {
-                location: {
-                    uri: textDocument.uri,
-                    range: Object.assign({}, diagnostic.range),
-                },
-                message: 'Particularly for names',
-            },
-        ];
-        diagnostics.push(diagnostic);
-    }
-
-    // Send the computed diagnostics to VSCode.
-    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
-}
 
 connection.onDidChangeWatchedFiles(change => {
     // Monitored files have change in VSCode
-    connection.console.log('We received an file change event');
+    console.log('We received an file change event');
 });
 
 connection.onDocumentSymbol((params) => {
@@ -146,9 +95,9 @@ connection.onHover((params, token, workDoneProgress, resultProgress) => {
     return htmlLanguageService.doHover(document, params.position, htmlDocument);
 });
 
-// Make the text document manager listen on the connection
-// for open, change and close text document events
 documents.listen(connection);
 
 // Listen on the connection
 connection.listen();
+
+export { connection };
