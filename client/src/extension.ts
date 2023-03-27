@@ -11,6 +11,8 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
+    workspace.getConfiguration().update('emmet.includeLanguages', { 'vue': 'html' });
+
     // The server is implemented in node
     const serverModule = context.asAbsolutePath(
         path.join('server', 'out', 'server.js')
