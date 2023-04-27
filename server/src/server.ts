@@ -9,6 +9,7 @@ import {
 } from 'vscode-languageserver/node';
 
 import { getLanguageService as getHtmlLanguageService } from 'vscode-html-languageservice';
+import { doHover, parseHTMLDocument } from 'vls';
 import { capabilities } from './config';
 import documents from './documents';
 import { validateTextDocument } from './validate';
@@ -39,6 +40,7 @@ connection.onDidChangeConfiguration(change => {
 });
 
 connection.onDidChangeTextDocument((change) => {
+    // TODO: 没有被触发
     console.log('onDidChangeTextDocument');
 });
 
@@ -91,8 +93,8 @@ connection.onHover((params, token, workDoneProgress, resultProgress) => {
     if (!document) {
         return null;
     }
-    const htmlDocument = htmlLanguageService.parseHTMLDocument(document);
-    return htmlLanguageService.doHover(document, params.position, htmlDocument);
+    const htmlDocument = parseHTMLDocument(document);
+    return doHover(document, params.position, htmlDocument, []);
 });
 
 documents.listen(connection);
