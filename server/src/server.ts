@@ -1,29 +1,20 @@
 import {
     createConnection,
-    TextDocuments,
-    Diagnostic,
-    DiagnosticSeverity,
     ProposedFeatures,
     InitializeParams,
     DidChangeConfigurationNotification,
     CompletionItem,
-    CompletionItemKind,
     TextDocumentPositionParams,
     TextDocumentSyncKind,
-    InitializeResult
+    InitializeResult,
+    TextDocuments,
+    HoverParams
 } from 'vscode-languageserver/node';
-
-import {
-    TextDocument
-} from 'vscode-languageserver-textdocument';
-
-import { compile, parseComponent } from "vue-template-compiler";
-import * as ts from "typescript";
+import { TextDocument } from 'vscode-languageserver-textdocument';
+import { getVueLanguageService } from "./vue-language-service";
+import VueTextDocuments, { configuration } from './vue-language-service/documents';
 
 const connection = createConnection(ProposedFeatures.all);
-
-// Create a simple text document manager.
-const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
@@ -77,15 +68,14 @@ connection.onInitialized(() => {
     }
 });
 
-connection.onDidChangeConfiguration(change => {
-    documents.all().forEach(updateTextDocument);
-});
-
-// The content of a text document has changed. This event is emitted
-// when the text document first opened or when its content has changed.
-documents.onDidChangeContent(change => {
-    updateTextDocument(change.document);
-});
+connection.onHover(
+    (params: HoverParams) => {
+        const document = documents.get(params.textDocument.uri);
+        if (document) {
+            return vueLanguageService.doHover(document, params.position);
+        }
+    }
+);
 
 connection.onCompletion(
     (params: TextDocumentPositionParams): CompletionItem[] => {
@@ -99,24 +89,22 @@ connection.onCompletionResolve(
     }
 );
 
+const documents = new VueTextDocuments(configuration);
+documents.onDidChangeContent(({ document }) => {
+    validateDocument(document);
+});
 documents.listen(connection);
 
 connection.listen();
 
-/** 更新文档 */
-async function updateTextDocument(textDocument: TextDocument): Promise<void> {
-    const { template, script } = parseComponent(textDocument.getText());
-    if (template) {
-        const { start: startOffset, end: endOffset } = template;
-        const content = template.content;
-        const ast = compile(content).ast;
-        console.log(ast);
-    }
-    if (script && script.lang === 'ts') {
-        const { start: startOffset, end: endOffset } = script;
-        const content = script.content;
-        const ast = ts.createSourceFile("source.ts", content, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
-        console.log(ast);
+const vueLanguageService = getVueLanguageService(documents);
+
+function validateDocument(document: TextDocument) {
+    const diagnostics = vueLanguageService.getDiagnostics(document);
+    if (diagnostics.length) {
+        connection.sendDiagnostics({
+            uri: document.uri,
+            diagnostics
+        });
     }
 }
-
