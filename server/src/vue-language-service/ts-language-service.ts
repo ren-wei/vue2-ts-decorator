@@ -13,12 +13,17 @@ const compilerOptions: ts.CompilerOptions = {
 
 export const documentExpressRangeMap = new Map<string, (start: number, length: number) => Range[]>();
 
-const getServicesHost = (documents: TextDocuments<TextDocument>):ts.LanguageServiceHost => {
+export const getServicesHost = (documents: TextDocuments<TextDocument>):ts.LanguageServiceHost => {
     return {
         getScriptFileNames: () => {
             return documents.all().map(getFileName);
         },
-        getScriptVersion: fileName => String(documents.get(fileName)?.version),
+        getScriptVersion: fileName => {
+            if (fileName.endsWith(".vue.ts")) {
+                fileName = fileName.slice(0, fileName.length - 3);
+            }
+            return String(documents.get(fileName)?.version);
+        },
         getScriptSnapshot: fileName => {
             const document = documents.get(fileName.slice(0, fileName.length - 3));
             if (!document) {

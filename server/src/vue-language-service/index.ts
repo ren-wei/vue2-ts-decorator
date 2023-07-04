@@ -16,11 +16,10 @@ const htmlLanguageService = getLanguageService();
  * @returns 语言服务器
  */
 export function getVueLanguageService(documents: VueTextDocuments) {
-    let tsLanguageService = getTypescriptLanguageService(documents);
     return {
         /** 获取模版中的诊断信息 */
         getDiagnostics(document: TextDocument): Diagnostic[] {
-            tsLanguageService = getTypescriptLanguageService(documents);
+            const tsLanguageService = documents.tsLanguageService;
             const diagnostics = tsLanguageService.getSemanticDiagnostics(getFileName(document));
             const getExpressRange = documentExpressRangeMap.get(document.uri);
             if (getExpressRange) {

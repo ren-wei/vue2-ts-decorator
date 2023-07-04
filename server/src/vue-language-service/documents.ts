@@ -2,17 +2,21 @@ import * as ts from "typescript";
 import { DocumentUri, TextDocumentContentChangeEvent, TextDocuments, TextDocumentsConfiguration, TextEdit } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { getLanguageService, HTMLDocument } from "vscode-html-languageservice";
-import { getTypescriptLanguageService } from './ts-language-service';
+import { getServicesHost } from './ts-language-service';
 
 const htmlLanguageService = getLanguageService();
 
 /** 基于 @see TextDocuments 扩展，提供操作 @see VueTextDocument 的方法 */
 export default class VueTextDocuments extends TextDocuments<VueTextDocument> {
+    public serviceHost: ts.LanguageServiceHost;
+    public documentRegistry: ts.DocumentRegistry;
     public tsLanguageService: ts.LanguageService;
 
     constructor(configuration: TextDocumentsConfiguration<VueTextDocument>) {
         super(configuration);
-        this.tsLanguageService = getTypescriptLanguageService(this);
+        this.serviceHost = getServicesHost(this);
+        this.documentRegistry = ts.createDocumentRegistry();
+        this.tsLanguageService = ts.createLanguageService(this.serviceHost, this.documentRegistry);
     }
 }
 
