@@ -7,12 +7,11 @@ import {
     TextDocumentPositionParams,
     TextDocumentSyncKind,
     InitializeResult,
-    TextDocuments,
     HoverParams
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { getVueLanguageService } from "./vue-language-service";
-import VueTextDocuments, { configuration } from './vue-language-service/documents';
+import VueTextDocuments, { VueTextDocument } from './vue-language-service/documents';
 
 const connection = createConnection(ProposedFeatures.all);
 
@@ -89,7 +88,7 @@ connection.onCompletionResolve(
     }
 );
 
-const documents = new VueTextDocuments(configuration);
+const documents = new VueTextDocuments(VueTextDocument);
 documents.onDidChangeContent(({ document }) => {
     validateDocument(document);
 });
