@@ -1,8 +1,7 @@
 import * as ts from "typescript";
 import { ASTElement, ASTExpression, compile, compileToFunctions } from "vue-template-compiler";
-import { TextDocument } from 'vscode-languageserver-textdocument';
-import { getLanguageService, Node, Range } from "vscode-html-languageservice";
-import { TextDocuments } from 'vscode-languageserver';
+import { getLanguageService, Node, Range, TextDocument } from "vscode-html-languageservice";
+import VueTextDocuments, { VueTextDocument } from './documents';
 
 const htmlLanguageService = getLanguageService();
 
@@ -13,16 +12,13 @@ const compilerOptions: ts.CompilerOptions = {
 
 export const documentExpressRangeMap = new Map<string, (start: number, length: number) => Range[]>();
 
-export const getServicesHost = (documents: TextDocuments<TextDocument>):ts.LanguageServiceHost => {
+export const getServicesHost = (documents: VueTextDocuments):ts.LanguageServiceHost => {
     return {
         getScriptFileNames: () => {
             return documents.all().map(getFileName);
         },
         getScriptVersion: fileName => {
-            if (fileName.endsWith(".vue.ts")) {
-                fileName = fileName.slice(0, fileName.length - 3);
-            }
-            return String(documents.get(fileName)?.version);
+            return String(documents.get(getUri(fileName))?.version);
         },
         getScriptSnapshot: fileName => {
             const document = documents.get(fileName.slice(0, fileName.length - 3));
@@ -39,8 +35,24 @@ export const getServicesHost = (documents: TextDocuments<TextDocument>):ts.Langu
     };
 };
 
+/** 获取文件名 */
+export function getFileName(document: TextDocument) {
+    if (document.uri.endsWith(".vue")) {
+        return document.uri + ".ts";
+    }
+    return document.uri;
+}
+
+/** 获取文件 uri */
+export function getUri(fileName: string) {
+    if (fileName.endsWith(".vue.ts")) {
+        return fileName.slice(0, fileName.length - 3);
+    }
+    return fileName;
+}
+
 /** 获取 vue 文件中的 ts 部分，将 template 中的表达式依次加入 render 方法中 */
-function getScriptString(document: TextDocument) {
+function getScriptString(document: VueTextDocument) {
     const htmlDocument = htmlLanguageService.parseHTMLDocument(document);
     const template = htmlDocument.roots.find(root => root.tag === "template");
     const script = htmlDocument.roots.find(root => root.tag === "script");
@@ -212,12 +224,6 @@ function getExpressPosition(mapping: string[], pos: number) {
     }
     return pos;
 }
-
-export function getFileName(document: TextDocument) {
-    return document.uri + ".ts";
-}
-
-export const getTypescriptLanguageService = (documents: TextDocuments<TextDocument>) => ts.createLanguageService(getServicesHost(documents));
 
 interface CompileExpressResult {
     express: string;

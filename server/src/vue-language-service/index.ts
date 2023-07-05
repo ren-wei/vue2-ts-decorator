@@ -2,8 +2,8 @@ import * as ts from "typescript";
 import { Diagnostic, Hover, TextDocuments } from 'vscode-languageserver';
 import { Position, TextDocument } from 'vscode-languageserver-textdocument';
 import { getLanguageService, Node, Range } from "vscode-html-languageservice";
-import { getTypescriptLanguageService, documentExpressRangeMap, getFileName } from "./ts-language-service";
 import VueTextDocuments from './documents';
+import { documentExpressRangeMap, getFileName } from './host';
 
 const htmlLanguageService = getLanguageService();
 
