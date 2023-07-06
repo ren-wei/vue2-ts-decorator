@@ -1,11 +1,7 @@
-import * as ts from "typescript";
-import { Diagnostic, Hover, TextDocuments } from 'vscode-languageserver';
-import { Position, TextDocument } from 'vscode-languageserver-textdocument';
-import { getLanguageService, Node, Range } from "vscode-html-languageservice";
-import VueTextDocuments from './documents';
-import { documentExpressRangeMap, getFileName } from './host';
-
-const htmlLanguageService = getLanguageService();
+import { Diagnostic, Hover, MarkupKind } from 'vscode-languageserver';
+import { Position } from 'vscode-languageserver-textdocument';
+import VueTextDocuments, { VueTextDocument } from './documents';
+import { getFileName } from './host';
 
 /**
  * 获取 vue 文件的语言服务器
@@ -18,23 +14,51 @@ const htmlLanguageService = getLanguageService();
 export function getVueLanguageService(documents: VueTextDocuments) {
     return {
         /** 获取模版中的诊断信息 */
-        getDiagnostics(document: TextDocument): Diagnostic[] {
+        getDiagnostics(document: VueTextDocument): Diagnostic[] {
             const tsLanguageService = documents.tsLanguageService;
-            const diagnostics = tsLanguageService.getSemanticDiagnostics(getFileName(document));
-            const getExpressRange = documentExpressRangeMap.get(document.uri);
-            if (getExpressRange) {
-                return diagnostics.reduce((total, diagnostic) => {
-                    const ranges = getExpressRange(diagnostic.start as number, diagnostic.length as number);
-                    total.push(...ranges.map(range => ({ range, message: String(diagnostic.messageText) })));
-                    return total;
-                }, [] as Diagnostic[]);
-            }
-            return [];
+            let diagnostics = tsLanguageService.getSemanticDiagnostics(getFileName(document));
+            diagnostics = diagnostics.filter(diagnostic => diagnostic.start && diagnostic.start > document.renderStart);
+            return diagnostics.map(diagnostic => {
+                const start = document.position.positionAtSource((diagnostic.start || 0));
+                const end = start + (diagnostic.length || 0);
+                return {
+                    range: {
+                        start: document.positionAt(start),
+                        end: document.positionAt(end),
+                    },
+                    message: diagnostic.messageText.toString()
+                };
+            });
         },
 
-        doHover(document: TextDocument, position: Position): Hover | null {
-            const htmlDocument = htmlLanguageService.parseHTMLDocument(document);
-            const template = htmlDocument.roots.find(root => root.tag === "template");
+        /** 鼠标悬浮显示信息 */
+        doHover(document: VueTextDocument, position: Position): Hover | null {
+            const tsLanguageService = documents.tsLanguageService;
+            const fileName = getFileName(document);
+            const pos = document.position.positionAtTarget(document.offsetAt(position));
+            const quickInfo = (tsLanguageService.getQuickInfoAtPosition(fileName, pos));
+            if (quickInfo && quickInfo.displayParts) {
+                const start = document.position.positionAtSource(quickInfo.textSpan.start);
+                const end = start + quickInfo.textSpan.length;
+                const first = quickInfo.displayParts[0];
+                if (first.kind === 'keyword' && first.text === "const") {
+                    first.text = `(property) ${document.vueComponent.name}`;
+                    if (quickInfo.displayParts[1]) {
+                        quickInfo.displayParts[1].text = ".";
+                    }
+                }
+                const content = quickInfo.displayParts.map(v => v.text).join("") || "";
+                return {
+                    range: {
+                        start: document.positionAt(start),
+                        end: document.positionAt(end),
+                    },
+                    contents: {
+                        kind: MarkupKind.Markdown,
+                        value: "```js\n" + content + "\n```"
+                    }
+                };
+            }
             return null;
         }
     };

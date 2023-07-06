@@ -9,14 +9,15 @@ import {
     InitializeResult,
     HoverParams
 } from 'vscode-languageserver/node';
-import { TextDocument } from 'vscode-languageserver-textdocument';
 import { getVueLanguageService } from "./vue-language-service";
 import VueTextDocuments, { VueTextDocument } from './vue-language-service/documents';
+import { getUri } from './vue-language-service/host';
 
 const connection = createConnection(ProposedFeatures.all);
 
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let hasDiagnosticRelatedInformationCapability = false;
 
 connection.onInitialize((params: InitializeParams) => {
@@ -42,7 +43,8 @@ connection.onInitialize((params: InitializeParams) => {
             // Tell the client that this server supports code completion.
             completionProvider: {
                 resolveProvider: true
-            }
+            },
+            hoverProvider: true
         }
     };
     if (hasWorkspaceFolderCapability) {
@@ -69,7 +71,7 @@ connection.onInitialized(() => {
 
 connection.onHover(
     (params: HoverParams) => {
-        const document = documents.get(params.textDocument.uri);
+        const document = documents.get(getUri(params.textDocument.uri));
         if (document) {
             return vueLanguageService.doHover(document, params.position);
         }
@@ -77,7 +79,7 @@ connection.onHover(
 );
 
 connection.onCompletion(
-    (params: TextDocumentPositionParams): CompletionItem[] => {
+    (_params: TextDocumentPositionParams): CompletionItem[] => {
         return [];
     }
 );
@@ -98,7 +100,7 @@ connection.listen();
 
 const vueLanguageService = getVueLanguageService(documents);
 
-function validateDocument(document: TextDocument) {
+function validateDocument(document: VueTextDocument) {
     const diagnostics = vueLanguageService.getDiagnostics(document);
     if (diagnostics.length) {
         connection.sendDiagnostics({

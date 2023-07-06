@@ -12,11 +12,18 @@ module.exports = {
     ],
     rules: {
         'semi': [2, "always"],
-        '@typescript-eslint/no-unused-vars': 0,
+        "@typescript-eslint/no-unused-vars": [
+            "warn",
+            {
+                "varsIgnorePattern": "^_",
+                "argsIgnorePattern": "^_"
+            }
+        ],
         '@typescript-eslint/no-explicit-any': 0,
         '@typescript-eslint/explicit-module-boundary-types': 0,
         '@typescript-eslint/no-non-null-assertion': 0,
         "no-console": 1,
         "indent": ["warn", 4],
+        "max-len": ["warn", { "code": 120 }]
     }
 };

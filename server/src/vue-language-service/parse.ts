@@ -2,6 +2,7 @@ import * as ts from "typescript";
 
 /** 解析 Vue 组件，获取 vue 组成部分 */
 export function parseComponent(component: ts.ClassDeclaration | undefined): VueComponent {
+    let name = "default";
     // 收集组件 model, props, data, computed 和 method
     let model = null as ts.PropertyDeclaration | null;
     const props: ts.PropertyDeclaration[] = [];
@@ -9,11 +10,15 @@ export function parseComponent(component: ts.ClassDeclaration | undefined): VueC
     const datas: ts.PropertyDeclaration[] = [];
     const methods: ts.MethodDeclaration[] = [];
     if (component) {
+        if (component.name) {
+            name = component.name.escapedText.toString();
+        }
         component.members.forEach(member => {
             if (member.kind === ts.SyntaxKind.PropertyDeclaration) {
                 const property = member as ts.PropertyDeclaration;
                 // 带有装饰器的属性是 model 或 props
-                const decorators = (property.modifiers || []).filter(modifier => modifier.kind === ts.SyntaxKind.Decorator) as ts.Decorator[];
+                const decorators = (property.modifiers || [])
+                    .filter(modifier => ts.isDecorator(modifier)) as ts.Decorator[];
                 if (decorators.length) {
                     decorators.forEach(decorator => {
                         if (decorator.expression.kind === ts.SyntaxKind.CallExpression) {
@@ -38,10 +43,11 @@ export function parseComponent(component: ts.ClassDeclaration | undefined): VueC
             }
         });
     }
-    return { model, props, computedProps, datas, methods };
+    return { name, model, props, computedProps, datas, methods };
 }
 
 export interface VueComponent {
+    name: string;
 	model: ts.PropertyDeclaration | null;
     props: ts.PropertyDeclaration[];
     computedProps: ts.GetAccessorDeclaration[];
