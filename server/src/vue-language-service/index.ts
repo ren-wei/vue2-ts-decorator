@@ -2,7 +2,7 @@ import { Diagnostic, Hover, MarkupKind } from 'vscode-languageserver';
 import { Position } from 'vscode-languageserver-textdocument';
 import VueTextDocuments, { VueTextDocument } from './documents';
 import { getFileName } from './host';
-import { TokenType, getLanguageService } from 'vscode-html-languageservice';
+import { TokenType } from 'vscode-html-languageservice';
 import { getNodeTokens } from './parse';
 
 /**
@@ -39,7 +39,9 @@ export function getVueLanguageService(documents: VueTextDocuments) {
             const node = document.htmlDocument.findNodeAt(offset);
             const { scanner, tokens } = getNodeTokens(document, node, offset);
             if (scanner.getTokenType() === TokenType.AttributeValue) {
-                if (tokens[tokens.length - 3].startsWith(":")) {
+                const attribute = tokens[tokens.length - 3];
+                const isDynamicAttribute = attribute.startsWith(":");
+                if (isDynamicAttribute) {
                     // 从 render 函数获取
                     return getHoverFromRender(documents, document, position);
                 }
