@@ -5,7 +5,7 @@ import VueTextDocuments, { VueTextDocument } from './documents';
 import { VueComponent, parseComponent } from './parse';
 import { PositionManager } from './position';
 
-const htmlLanguageService = getLanguageService();
+export const htmlLanguageService = getLanguageService();
 
 const compilerOptions: ts.CompilerOptions = {
     target: ts.ScriptTarget.ESNext,

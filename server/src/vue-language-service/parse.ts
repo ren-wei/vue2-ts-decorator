@@ -1,4 +1,7 @@
 import * as ts from "typescript";
+import { Node, TokenType } from "vscode-html-languageservice";
+import { VueTextDocument } from './documents';
+import { htmlLanguageService } from './host';
 
 /** 解析 Vue 组件，获取 vue 组成部分 */
 export function parseComponent(component: ts.ClassDeclaration | undefined): VueComponent {
@@ -44,6 +47,22 @@ export function parseComponent(component: ts.ClassDeclaration | undefined): VueC
         });
     }
     return { name, model, props, computedProps, datas, methods };
+}
+
+/** 解析 html 节点，获取 token 和当前所在的 token 的 scanner */
+export function getNodeTokens(document: VueTextDocument, node: Node, offset: number) {
+    const content = document.getText().slice(node.start, node.end);
+    const scanner = htmlLanguageService.createScanner(content);
+    const tokens: string[] = [];
+    let token = scanner.scan();
+    while(token !== TokenType.EOS) {
+        tokens.push(scanner.getTokenText());
+        if (scanner.getTokenOffset() + scanner.getTokenLength() > offset - node.start) {
+            break;
+        }
+        token = scanner.scan();
+    }
+    return { scanner, tokens };
 }
 
 export interface VueComponent {
