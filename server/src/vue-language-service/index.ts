@@ -1,7 +1,7 @@
-import { Diagnostic, Hover, MarkupKind } from 'vscode-languageserver';
+import { Diagnostic, Hover } from 'vscode-languageserver';
 import { Position } from 'vscode-languageserver-textdocument';
 import VueTextDocuments, { VueTextDocument } from './documents';
-import { getFileName } from './host';
+import { getFileName, getPropertyName, htmlLanguageService } from './host';
 import { TokenType } from 'vscode-html-languageservice';
 import { getNodeTokens } from './parse';
 
@@ -46,6 +46,9 @@ export function getVueLanguageService(documents: VueTextDocuments) {
                     return getHoverFromRender(documents, document, position);
                 }
             }
+            if (document.htmlDocument.findNodeAt(offset).tag === "script") {
+                return htmlLanguageService.doHover(document, position, document.htmlDocument);
+            }
             return null;
         }
     };
@@ -62,9 +65,25 @@ function getHoverFromRender(documents: VueTextDocuments, document: VueTextDocume
         const end = start + quickInfo.textSpan.length;
         const first = quickInfo.displayParts[0];
         if (first.kind === 'keyword' && first.text === "const") {
-            first.text = `(property) ${document.vueComponent.name}`;
-            if (quickInfo.displayParts[1]) {
-                quickInfo.displayParts[1].text = ".";
+            const name = document.getText().slice(start, end);
+            const { model, props, computedProps, datas, methods } = document.vueComponent;
+            let type = "";
+            if (model && getPropertyName(model) === name) {
+                type = "model";
+            } else if (props.find(prop => getPropertyName(prop) === name)) {
+                type = "property";
+            } else if (computedProps.find(prop => getPropertyName(prop) === name)) {
+                type = "computed";
+            } else if (datas.find(data => getPropertyName(data) === name)) {
+                type = "data";
+            } else if (methods.find(method => getPropertyName(method) === name)) {
+                type = "method";
+            }
+            if (type) {
+                first.text = `(${type}) ${document.vueComponent.name}`;
+                if (quickInfo.displayParts[1]) {
+                    quickInfo.displayParts[1].text = ".";
+                }
             }
         }
         const content = quickInfo.displayParts.map(v => v.text).join("") || "";
@@ -73,10 +92,13 @@ function getHoverFromRender(documents: VueTextDocuments, document: VueTextDocume
                 start: document.positionAt(start),
                 end: document.positionAt(end),
             },
-            contents: {
-                kind: MarkupKind.Markdown,
-                value: "```js\n" + content + "\n```"
-            }
+            contents: [
+                ...(quickInfo.documentation || []).map(item => ({ language: item.kind, value: item.text})),
+                {
+                    language: "js",
+                    value: content
+                }
+            ]
         };
     }
     return null;

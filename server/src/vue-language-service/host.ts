@@ -77,6 +77,15 @@ function getScriptString(document: VueTextDocument) {
     return "";
 }
 
+/** 获取属性、计算属性、数据、方法的名称 */
+export function getPropertyName(property: ts.PropertyDeclaration | ts.GetAccessorDeclaration | ts.MethodDeclaration) {
+    const name = property.name;
+    if (ts.isIdentifier(name)) {
+        return name.escapedText;
+    }
+    return "";
+}
+
 /**
  * 获取 render 函数字符串和位置
  * @param vueComponent 当前组件
@@ -87,13 +96,6 @@ function getScriptString(document: VueTextDocument) {
 function getRenderString(vueComponent: VueComponent, renderStart: number, express: Record<number, string>) {
     const header = "render(){";
     const footer = "}";
-    const getPropertyName = (property: ts.PropertyDeclaration | ts.GetAccessorDeclaration | ts.MethodDeclaration) => {
-        const name = property.name;
-        if (ts.isIdentifier(name)) {
-            return name.escapedText;
-        }
-        return "";
-    };
     const propertyList = [
         ...(vueComponent.model ? [vueComponent.model] : []),
         ...vueComponent.props,
