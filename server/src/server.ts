@@ -102,10 +102,8 @@ const vueLanguageService = getVueLanguageService(documents);
 
 function validateDocument(document: VueTextDocument) {
     const diagnostics = vueLanguageService.getDiagnostics(document);
-    if (diagnostics.length) {
-        connection.sendDiagnostics({
-            uri: document.uri,
-            diagnostics
-        });
-    }
+    connection.sendDiagnostics({
+        uri: document.uri,
+        diagnostics
+    });
 }
