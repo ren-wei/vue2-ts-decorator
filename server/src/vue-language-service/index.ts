@@ -38,13 +38,36 @@ export function getVueLanguageService(documents: VueTextDocuments) {
             const offset = document.offsetAt(position);
             const node = document.htmlDocument.findNodeAt(offset);
             const { scanner, tokens } = getNodeTokens(document, node, offset);
-            if (scanner.getTokenType() === TokenType.AttributeValue) {
-                const attribute = tokens[tokens.length - 3];
-                const isDynamicAttribute = attribute.startsWith(":");
-                if (isDynamicAttribute) {
-                    // 从 render 函数获取
-                    return getHoverFromRender(documents, document, position);
-                }
+            switch(scanner.getTokenType()) {
+                case TokenType.AttributeValue:
+                    const attribute = tokens[tokens.length - 3];
+                    const isDynamicAttribute = attribute.startsWith(":");
+                    if (isDynamicAttribute) {
+                        // 从 render 函数获取
+                        return getHoverFromRender(documents, document, position);
+                    }
+                    break;
+
+                case TokenType.Content:
+                    const content = scanner.getTokenText();
+                    const index = offset - (node.startTagEnd || node.start);
+                    // 左侧
+                    let rightMarkIndex = content.lastIndexOf("}}", index);
+                    let leftMarkIndex = content.lastIndexOf("{{", index);
+                    const leftValid =  leftMarkIndex !== -1 && leftMarkIndex > rightMarkIndex;
+                    // 右侧
+                    if (leftValid) {
+                        rightMarkIndex = content.indexOf("}}", index);
+                        leftMarkIndex = content.indexOf("{{", index);
+                        if (leftMarkIndex === -1) {
+                            leftMarkIndex = Infinity;
+                        }
+                        const rightValid = rightMarkIndex !== -1 && rightMarkIndex < leftMarkIndex;
+                        if (rightValid) {
+                            return getHoverFromRender(documents, document, position);
+                        }
+                    }
+                    break;
             }
             if (document.htmlDocument.findNodeAt(offset).tag === "script") {
                 return htmlLanguageService.doHover(document, position, document.htmlDocument);
