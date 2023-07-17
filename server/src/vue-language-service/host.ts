@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as ts from "typescript";
 import { ASTElement, ASTExpression, compile } from "vue-template-compiler";
 import { getLanguageService, Node, TextDocument } from "vscode-html-languageservice";
@@ -30,8 +31,14 @@ export const getServicesHost = (documents: VueTextDocuments):ts.LanguageServiceH
         getCurrentDirectory: () => "/",
         getCompilationSettings: () => compilerOptions,
         getDefaultLibFileName: ts.getDefaultLibFileName,
-        fileExists: ts.sys.fileExists,
-        readFile: ts.sys.readFile,
+        fileExists: (path: string) => {
+            path = path.replace("file://", "");
+            return fs.existsSync(path);
+        },
+        readFile: (path: string) => {
+            path = path.replace("file://","");
+            return fs.readFileSync(path, { encoding: "utf8" });
+        },
     };
 };
 
@@ -146,6 +153,9 @@ function getExpress(document: TextDocument, template: Node) {
 
 /** 收集元素中的所有表达式 */
 function collectExpress(document: TextDocument, element: ASTElement, node: Node): Expression[] {
+    if (!node) {
+        return [];
+    }
     const express: Expression[] = [];
     // 处理 ASTElement, 收集属性值中的表达式
     element.attrsList.filter(({ name }) => name[0] === ':').forEach(({ name, value }) => {

@@ -9,7 +9,7 @@ import {
     InitializeResult,
     HoverParams
 } from 'vscode-languageserver/node';
-import { getVueLanguageService } from "./vue-language-service";
+import VueLanguageService from "./vue-language-service";
 import VueTextDocuments, { VueTextDocument } from './vue-language-service/documents';
 import { getUri } from './vue-language-service/host';
 
@@ -42,6 +42,7 @@ connection.onInitialize((params: InitializeParams) => {
             textDocumentSync: TextDocumentSyncKind.Incremental,
             // Tell the client that this server supports code completion.
             completionProvider: {
+                triggerCharacters: ["."],
                 resolveProvider: true
             },
             hoverProvider: true
@@ -79,7 +80,11 @@ connection.onHover(
 );
 
 connection.onCompletion(
-    (_params: TextDocumentPositionParams): CompletionItem[] => {
+    (params: TextDocumentPositionParams): CompletionItem[] => {
+        const document = documents.get(getUri(params.textDocument.uri));
+        if (document) {
+            return vueLanguageService.doComplete(document, params.position);
+        }
         return [];
     }
 );
@@ -98,7 +103,7 @@ documents.listen(connection);
 
 connection.listen();
 
-const vueLanguageService = getVueLanguageService(documents);
+const vueLanguageService = new VueLanguageService(documents);
 
 function validateDocument(document: VueTextDocument) {
     const diagnostics = vueLanguageService.getDiagnostics(document);
