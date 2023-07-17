@@ -23,7 +23,8 @@ module.exports = {
         '@typescript-eslint/explicit-module-boundary-types': 0,
         '@typescript-eslint/no-non-null-assertion': 0,
         "no-console": 1,
-        "indent": ["warn", 4],
-        "max-len": ["warn", { "code": 120 }]
+        "indent": ["warn", 4, { "SwitchCase": 1 }],
+        "max-len": ["warn", { "code": 120 }],
+        "no-case-declarations": 0
     }
 };
