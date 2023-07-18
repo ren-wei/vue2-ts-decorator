@@ -5,6 +5,7 @@ import VueTextDocuments, { VueTextDocument } from './documents';
 import { getFileName, getPropertyName, htmlLanguageService } from './host';
 import { TokenType } from 'vscode-html-languageservice';
 import { getNodeTokens } from './parse';
+import { bindingReg } from './compile';
 
 /**
  * 获取 vue 文件的语言服务器
@@ -82,8 +83,7 @@ export default class VueLanguageService {
         switch(scanner.getTokenType()) {
             case TokenType.AttributeValue:
                 const attribute = tokens[tokens.length - 3];
-                const isDynamicAttribute = attribute.startsWith(":");
-                if (isDynamicAttribute) {
+                if (bindingReg.test(attribute)) {
                     return true;
                 }
                 break;

@@ -34,6 +34,9 @@ export function compileTemplate2Render(
     };
 }
 
+/** 属性绑定或指令 */
+export const bindingReg = /^:|^v-\w+/;
+
 /** 获取函数主体部分，并将映射位置加入 source 和 target */
 function compileNode(
     templateString: string, 
@@ -44,9 +47,7 @@ function compileNode(
     body = ""
 ): string {
     const attributeNames = node.attributes ? Object.keys(node.attributes) : [];
-    /** 属性绑定或指令 */
-    const binding = /^:/;
-    const isStatic = attributeNames.every(name => !binding.test(name));
+    const isStatic = attributeNames.every(name => !bindingReg.test(name));
     if (!isStatic) {
         const scanner = htmlLanguageService.createScanner(templateString, node.start);
         const tokens: string[] = [];
@@ -57,8 +58,8 @@ function compileNode(
                 const name = tokens[tokens.length - 3];
                 let value = tokens[tokens.length - 1];
                 value = value.slice(1, value.length - 1); // 去掉两侧引号
-                if (binding.test(name)) {
-                    source.push(scanner.getTokenOffset() + 1);
+                if (bindingReg.test(name)) {
+                    source.push(scanner.getTokenOffset() + 1); // 1 是去掉引号的偏移
                     target.push(offset + body.length);
                     body += `${value};`;
                 }
