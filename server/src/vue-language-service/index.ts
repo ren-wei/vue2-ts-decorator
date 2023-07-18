@@ -115,8 +115,8 @@ export default class VueLanguageService {
     private getHoverFromRender(document: VueTextDocument, position: Position): Hover | null {
         const tsLanguageService = this.documents.tsLanguageService;
         const fileName = getFileName(document);
-        const pos = document.position.positionAtTarget(document.offsetAt(position));
-        const quickInfo = (tsLanguageService.getQuickInfoAtPosition(fileName, pos));
+        const offset = document.position.positionAtTarget(document.offsetAt(position));
+        const quickInfo = (tsLanguageService.getQuickInfoAtPosition(fileName, offset));
         if (quickInfo && quickInfo.displayParts) {
             const start = document.position.positionAtSource(quickInfo.textSpan.start);
             const end = start + quickInfo.textSpan.length;
