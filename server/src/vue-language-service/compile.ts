@@ -21,10 +21,11 @@ export function compileTemplate2Render(
     const predefine = `const {${[predefineList].join(',')}} = this;`;
     const source: number[] = [];
     const target: number[] = [];
+    const body = compileNode(templateString, template, source, target, offset + header.length + predefine.length);
     const render = [
         header,
         predefine,
-        compileNode(templateString, template, source, target, offset + header.length + predefine.length),
+        body,
         footer,
     ].join("");
     const position = new PositionManager(source, target);
@@ -48,6 +49,7 @@ function compileNode(
 ): string {
     const attributeNames = node.attributes ? Object.keys(node.attributes) : [];
     const isStatic = attributeNames.every(name => !bindingReg.test(name));
+    let suffix = "";
     if (!isStatic) {
         const scanner = htmlLanguageService.createScanner(templateString, node.start);
         const tokens: string[] = [];
@@ -58,10 +60,34 @@ function compileNode(
                 const name = tokens[tokens.length - 3];
                 let value = tokens[tokens.length - 1];
                 value = value.slice(1, value.length - 1); // 去掉两侧引号
-                if (bindingReg.test(name)) {
-                    source.push(scanner.getTokenOffset() + 1); // 1 是去掉引号的偏移
+                const valueOffset = scanner.getTokenOffset() + 1; // + 1 是去掉引号的偏移
+                const updatePosition = () => {
+                    source.push(valueOffset);
                     target.push(offset + body.length);
-                    body += `${value};`;
+                };
+                switch (name) {
+                    case "v-if":
+                        body += "if(";
+                        updatePosition();
+                        body += `${value}) {`;
+                        suffix = "}";
+                        break;
+                    case "v-else-if":
+                        body += "else if(";
+                        updatePosition();
+                        body += `${value}) {`;
+                        suffix = "}";
+                        break;
+                    case "v-else":
+                        body += "} else {";
+                        suffix = "}";
+                        break;
+                    default:
+                        if (bindingReg.test(name)) {
+                            source.push(valueOffset);
+                            target.push(offset + body.length);
+                            body += `${value};`;
+                        }
                 }
             } else if (token === TokenType.Content) {
                 const vueTemplateRegex = /{{\s*(.*?)\s*}}+/g;
@@ -79,8 +105,8 @@ function compileNode(
     }
     for (let i = 0; i < node.children.length; i++) {
         const child = node.children[i];
-        body += compileNode(templateString, child, source, target, offset, body);
-        
+        body = compileNode(templateString, child, source, target, offset, body);
     }
+    body += suffix;
     return body;
 }
