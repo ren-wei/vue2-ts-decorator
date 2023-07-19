@@ -36,7 +36,7 @@ export function compileTemplate2Render(
 }
 
 /** 属性绑定或指令 */
-export const bindingReg = /^:|^v-\w+/;
+export const bindingReg = /^:|^v-\w+|^@/;
 
 /** 获取函数主体部分，并将映射位置加入 source 和 target */
 function compileNode(
