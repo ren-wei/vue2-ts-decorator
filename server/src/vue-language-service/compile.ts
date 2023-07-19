@@ -69,17 +69,23 @@ function compileNode(
                     case "v-if":
                         body += "if(";
                         updatePosition();
-                        body += `${value}) {`;
+                        body += `${value}){`;
                         suffix = "}";
                         break;
                     case "v-else-if":
                         body += "else if(";
                         updatePosition();
-                        body += `${value}) {`;
+                        body += `${value}){`;
                         suffix = "}";
                         break;
                     case "v-else":
-                        body += "} else {";
+                        body += "}else{";
+                        suffix = "}";
+                        break;
+                    case "v-for":
+                        body += "for(const ";
+                        updatePosition();
+                        body += `${value.replace(/\sin\s/, " of ")}){`;
                         suffix = "}";
                         break;
                     default:
