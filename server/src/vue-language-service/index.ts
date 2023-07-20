@@ -38,7 +38,7 @@ export default class VueLanguageService {
 
     /** 鼠标悬浮显示信息 */
     public doHover(document: VueTextDocument, position: Position): Hover | null {
-        if (this.isExpressionRange(document, position)) {
+        if (this.getVueTokenType(document, position) === VueTokenType.DynamicAttributeValue) {
             return this.getHoverFromRender(document, position);
         }
         if (document.htmlDocument.findNodeAt(document.offsetAt(position)).tag === "script") {
@@ -47,44 +47,30 @@ export default class VueLanguageService {
         return null;
     }
 
+    /** 自动补全 */
     public doComplete(document: VueTextDocument, position: Position): CompletionItem[] {
-        if (this.isExpressionRange(document, position)) {
-            const tsLanguageService = this.documents.tsLanguageService;
-            const fileName = getFileName(document);
-            const pos = document.position.positionAtTarget(document.offsetAt(position));
-            const completionInfoList = tsLanguageService.getCompletionsAtPosition(
-                fileName,
-                pos,
-                {
-                    includeSymbol: true,
-                    includeCompletionsWithInsertText: true,
-                }
-            );
-            if (completionInfoList) {
-                const completionList = completionInfoList.entries
-                    .filter(item => [
-                        ts.ScriptElementKind.constElement,
-                        ts.ScriptElementKind.memberVariableElement
-                    ].includes(item.kind));
-                return completionList.map(item => ({
-                    label: item.name,
-                    kind: tsKind2CompletionItemKind(item.kind)
-                }));
-            }
+        if (this.getVueTokenType(document, position) === VueTokenType.DynamicAttributeValue) {
+            return this.getCompleteFromRender(document, position);
         }
         return [];
     }
 
-    /** 是否处于表达式范围内 */
-    private isExpressionRange(document: VueTextDocument, position: Position) {
+    /** 获取当前所处的位置类型 */
+    private getVueTokenType(document: VueTextDocument, position: Position): VueTokenType {
         const offset = document.offsetAt(position);
         const node = document.htmlDocument.findNodeAt(offset);
         const { scanner, tokens } = getNodeTokens(document, node, offset);
         switch(scanner.getTokenType()) {
+            case TokenType.StartTag:
+                const tag = (scanner.getTokenText());
+                if (document.vueComponent.components.find(c => c.name === tag)) {
+                    return VueTokenType.ComponentName;
+                }
+                break;
             case TokenType.AttributeValue:
                 const attribute = tokens[tokens.length - 3];
                 if (bindingReg.test(attribute)) {
-                    return true;
+                    return VueTokenType.DynamicAttributeValue;
                 }
                 break;
 
@@ -104,14 +90,14 @@ export default class VueLanguageService {
                     }
                     const rightValid = rightMarkIndex !== -1 && rightMarkIndex < leftMarkIndex;
                     if (rightValid) {
-                        return true;
+                        return VueTokenType.DynamicAttributeValue;
                     }
                 }
                 break;
         }
+        return VueTokenType.Other;
     }
 
-    /** 从 render 函数获取 hover */
     private getHoverFromRender(document: VueTextDocument, position: Position): Hover | null {
         const tsLanguageService = this.documents.tsLanguageService;
         const fileName = getFileName(document);
@@ -160,6 +146,32 @@ export default class VueLanguageService {
         }
         return null;
     }
+
+    private getCompleteFromRender(document: VueTextDocument, position: Position): CompletionItem[] {
+        const tsLanguageService = this.documents.tsLanguageService;
+        const fileName = getFileName(document);
+        const pos = document.position.positionAtTarget(document.offsetAt(position));
+        const completionInfoList = tsLanguageService.getCompletionsAtPosition(
+            fileName,
+            pos,
+            {
+                includeSymbol: true,
+                includeCompletionsWithInsertText: true,
+            }
+        );
+        if (completionInfoList) {
+            const completionList = completionInfoList.entries
+                .filter(item => [
+                    ts.ScriptElementKind.constElement,
+                    ts.ScriptElementKind.memberVariableElement
+                ].includes(item.kind));
+            return completionList.map(item => ({
+                label: item.name,
+                kind: tsKind2CompletionItemKind(item.kind)
+            }));
+        }
+        return [];
+    }
 }
 
 function tsKind2CompletionItemKind(kind: ts.ScriptElementKind): CompletionItemKind {
@@ -203,4 +215,13 @@ function tsKind2CompletionItemKind(kind: ts.ScriptElementKind): CompletionItemKi
         [ts.ScriptElementKind.warning]: CompletionItemKind.Text,
         [ts.ScriptElementKind.jsxAttribute]: CompletionItemKind.Field
     }[kind];
+}
+
+enum VueTokenType {
+    /** 组件名称 */
+    ComponentName,
+    /** 动态属性值 */
+    DynamicAttributeValue,
+    /** 其他 */
+    Other,
 }
