@@ -70,7 +70,7 @@ function getScriptString(document: VueTextDocument) {
         if (component && ts.isClassDeclaration(component)) {
             /** render 函数插入的位置，以 ts 开始位置为基准 */
             const pos = component.members[component.members.length - 1].end;
-            document.vueComponent = parseComponent(component);
+            document.vueComponent = parseComponent(ast);
             document.renderStart = pos;
             const propertyList = [
                 ...(document.vueComponent.model ? [document.vueComponent.model] : []),

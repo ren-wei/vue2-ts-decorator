@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import { CompletionItem, CompletionItemKind, Diagnostic, Hover } from 'vscode-languageserver';
+import { CompletionItem, CompletionItemKind, Diagnostic, Hover, InsertTextFormat } from 'vscode-languageserver';
 import { Position } from 'vscode-languageserver-textdocument';
 import VueTextDocuments, { VueTextDocument } from './documents';
 import { getFileName, getPropertyName, htmlLanguageService } from './host';
@@ -41,7 +41,7 @@ export default class VueLanguageService {
         if (this.getVueTokenType(document, position) === VueTokenType.DynamicAttributeValue) {
             return this.getHoverFromRender(document, position);
         }
-        if (document.htmlDocument.findNodeAt(document.offsetAt(position)).tag === "script") {
+        if (document.htmlDocument.findNodeAt(document.offsetAt(position)).tag !== "script") {
             return htmlLanguageService.doHover(document, position, document.htmlDocument);
         }
         return null;
@@ -49,10 +49,14 @@ export default class VueLanguageService {
 
     /** 自动补全 */
     public doComplete(document: VueTextDocument, position: Position): CompletionItem[] {
-        if (this.getVueTokenType(document, position) === VueTokenType.DynamicAttributeValue) {
-            return this.getCompleteFromRender(document, position);
+        switch (this.getVueTokenType(document, position)) {
+            case VueTokenType.DynamicAttributeValue:
+                return this.getCompleteFromRender(document, position);
+            case VueTokenType.ComponentNameContent:
+                return this.getCompleteFromComponentNameContent(document, position);
+            default:
+                return htmlLanguageService.doComplete(document, position, document.htmlDocument).items;
         }
-        return [];
     }
 
     /** 获取当前所处的位置类型 */
@@ -76,6 +80,9 @@ export default class VueLanguageService {
 
             case TokenType.Content:
                 const content = scanner.getTokenText();
+                if (/^\s*[A-Z][a-zA-Z0-9]*\s*$/.test(content)) {
+                    return VueTokenType.ComponentNameContent;
+                }
                 const index = offset - (node.startTagEnd || node.start);
                 // 左侧
                 let rightMarkIndex = content.lastIndexOf("}}", index);
@@ -172,6 +179,28 @@ export default class VueLanguageService {
         }
         return [];
     }
+
+    private getCompleteFromComponentNameContent(document: VueTextDocument, position: Position): CompletionItem[] {
+        const offset = document.offsetAt(position);
+        const node = document.htmlDocument.findNodeAt(offset);
+        const { scanner } = getNodeTokens(document, node, offset);
+        const content = scanner.getTokenText();
+        const match = (/^(\s*)([A-Z][a-zA-Z0-9]*)\s*$/.exec(content)) as RegExpExecArray;
+        const space = match[1];
+        const name = match[2];
+        const tokenOffset = node.start + scanner.getTokenOffset();
+        const start = document.positionAt(tokenOffset + space.length);
+        const end = document.positionAt(tokenOffset + space.length + name.length);
+        return document.vueComponent.components.map(c => ({
+            label: c.name,
+            kind: CompletionItemKind.Class,
+            insertTextFormat: InsertTextFormat.Snippet,
+            textEdit: {
+                range: { start, end },
+                newText: `<${c.name}>$0</${c.name}>`
+            },
+        }));
+    }
 }
 
 function tsKind2CompletionItemKind(kind: ts.ScriptElementKind): CompletionItemKind {
@@ -222,6 +251,8 @@ enum VueTokenType {
     ComponentName,
     /** 动态属性值 */
     DynamicAttributeValue,
+    /** 可能是组件名称的内容 */
+    ComponentNameContent,
     /** 其他 */
     Other,
 }
