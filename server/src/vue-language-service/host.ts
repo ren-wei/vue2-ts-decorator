@@ -57,21 +57,22 @@ export function getUri(fileName: string) {
     return fileName;
 }
 
-/** 获取 vue 文件中的 ts 部分，将 template 中的表达式依次加入 render 方法中 */
+/** 获取 vue 文件中的 ts 部分，前面的模版部分使用空格填充，将 template 中的表达式依次加入 render 方法中 */
 function getScriptString(document: VueTextDocument) {
     document.htmlDocument = htmlLanguageService.parseHTMLDocument(document);
     const template = document.htmlDocument.roots.find(root => root.tag === "template");
     const script = document.htmlDocument.roots.find(root => root.tag === "script");
     if (template && script) {
-        let content = document.getText().slice(script.startTagEnd || script.start, script.endTagStart || script.end);
+        const scriptStart = script.startTagEnd || script.start;
+        let content = document.getText().slice(scriptStart, script.endTagStart || script.end);
         const ast = ts.createSourceFile("source.ts", content, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
         // 找到组件类
         const component = ast.statements.find(statement => statement.kind === ts.SyntaxKind.ClassDeclaration);
         if (component && ts.isClassDeclaration(component)) {
-            /** render 函数插入的位置，以 ts 开始位置为基准 */
+            /** render 函数插入的位置 */
             const pos = component.members[component.members.length - 1].end;
             document.vueComponent = parseComponent(ast);
-            document.renderStart = pos;
+            document.renderStart = pos + scriptStart;
             const propertyList = [
                 ...(document.vueComponent.model ? [document.vueComponent.model] : []),
                 ...document.vueComponent.props,
@@ -90,7 +91,7 @@ function getScriptString(document: VueTextDocument) {
             // 增加 render 函数
             content = content.slice(0, pos) + render + content.slice(pos);
         }
-        return content;
+        return content.padStart(scriptStart + content.length);
     }
     return "";
 }
