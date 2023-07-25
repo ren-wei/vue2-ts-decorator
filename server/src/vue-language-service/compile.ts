@@ -1,6 +1,6 @@
 import { Node, TokenType } from "vscode-html-languageservice";
-import { PositionManager } from './position';
-import { htmlLanguageService } from './host';
+import { PositionManager } from "./position";
+import { htmlLanguageService } from "./host";
 
 /**
  * 编译 template 为 ts 下仅用于提供编译信息的 render 函数
@@ -18,7 +18,7 @@ export function compileTemplate2Render(
 ) {
     const header = "render(){";
     const footer = "}";
-    const predefine = `const {${[predefineList].join(',')}} = this;`;
+    const predefine = `const {${[predefineList].join(",")}} = this;`;
     const source: number[] = [];
     const target: number[] = [];
     const body = compileNode(templateString, template, source, target, offset + header.length + predefine.length);
@@ -31,7 +31,7 @@ export function compileTemplate2Render(
     const position = new PositionManager(source, target);
     return {
         render,
-        position
+        position,
     };
 }
 
@@ -40,7 +40,7 @@ export const bindingReg = /^:|^v-\w+|^@/;
 
 /** 获取函数主体部分，并将映射位置加入 source 和 target */
 function compileNode(
-    templateString: string, 
+    templateString: string,
     node: Node,
     source: number[],
     target: number[],
@@ -54,7 +54,7 @@ function compileNode(
         const scanner = htmlLanguageService.createScanner(templateString, node.start);
         const tokens: string[] = [];
         let token = scanner.scan();
-        while(scanner.getTokenOffset() < node.end) {
+        while (scanner.getTokenOffset() < node.end) {
             tokens.push(scanner.getTokenText());
             if (token === TokenType.AttributeValue) {
                 const name = tokens[tokens.length - 3];

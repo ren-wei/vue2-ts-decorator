@@ -7,7 +7,7 @@ export class PositionManager {
      */
     constructor(public source: number[], public target: number[]) {
         if (source.length !== target.length) {
-            throw "[PositionManager]: The length of the `source` must be equal to the length of the `target`.";
+            throw new Error("[PositionManager]: The length of the `source` must be equal to the length of the `target`.");
         }
     }
 

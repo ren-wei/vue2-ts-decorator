@@ -7,11 +7,11 @@ import {
     TextDocumentPositionParams,
     TextDocumentSyncKind,
     InitializeResult,
-    HoverParams
-} from 'vscode-languageserver/node';
+    HoverParams,
+} from "vscode-languageserver/node";
 import VueLanguageService from "./vue-language-service";
-import VueTextDocuments, { VueTextDocument } from './vue-language-service/documents';
-import { getUri } from './vue-language-service/host';
+import VueTextDocuments, { VueTextDocument } from "./vue-language-service/documents";
+import { getUri } from "./vue-language-service/host";
 
 const connection = createConnection(ProposedFeatures.all);
 
@@ -32,9 +32,9 @@ connection.onInitialize((params: InitializeParams) => {
         capabilities.workspace && !!capabilities.workspace.workspaceFolders
     );
     hasDiagnosticRelatedInformationCapability = !!(
-        capabilities.textDocument &&
-		capabilities.textDocument.publishDiagnostics &&
-		capabilities.textDocument.publishDiagnostics.relatedInformation
+        capabilities.textDocument
+		&& capabilities.textDocument.publishDiagnostics
+		&& capabilities.textDocument.publishDiagnostics.relatedInformation
     );
 
     const result: InitializeResult = {
@@ -43,16 +43,16 @@ connection.onInitialize((params: InitializeParams) => {
             // Tell the client that this server supports code completion.
             completionProvider: {
                 triggerCharacters: ["."],
-                resolveProvider: true
+                resolveProvider: true,
             },
-            hoverProvider: true
-        }
+            hoverProvider: true,
+        },
     };
     if (hasWorkspaceFolderCapability) {
         result.capabilities.workspace = {
             workspaceFolders: {
-                supported: true
-            }
+                supported: true,
+            },
         };
     }
     return result;
@@ -64,8 +64,8 @@ connection.onInitialized(() => {
         connection.client.register(DidChangeConfigurationNotification.type, undefined);
     }
     if (hasWorkspaceFolderCapability) {
-        connection.workspace.onDidChangeWorkspaceFolders(_event => {
-            connection.console.log('Workspace folder change event received.');
+        connection.workspace.onDidChangeWorkspaceFolders(event => {
+            connection.console.log("Workspace folder change event received.");
         });
     }
 });
@@ -109,6 +109,6 @@ function validateDocument(document: VueTextDocument) {
     const diagnostics = vueLanguageService.getDiagnostics(document);
     connection.sendDiagnostics({
         uri: document.uri,
-        diagnostics
+        diagnostics,
     });
 }

@@ -1,9 +1,9 @@
-import * as fs from 'fs';
+import * as fs from "fs";
 import * as ts from "typescript";
 import { getLanguageService, TextDocument } from "vscode-html-languageservice";
-import VueTextDocuments, { VueTextDocument } from './documents';
-import { parseComponent } from './parse';
-import { compileTemplate2Render } from './compile';
+import VueTextDocuments, { VueTextDocument } from "./documents";
+import { parseComponent } from "./parse";
+import { compileTemplate2Render } from "./compile";
 
 export const htmlLanguageService = getLanguageService();
 
@@ -35,7 +35,7 @@ export const getServicesHost = (documents: VueTextDocuments):ts.LanguageServiceH
             return fs.existsSync(path);
         },
         readFile: (path: string) => {
-            path = path.replace("file://","");
+            path = path.replace("file://", "");
             return fs.readFileSync(path, { encoding: "utf8" });
         },
     };
@@ -78,7 +78,7 @@ function getScriptString(document: VueTextDocument) {
                 ...document.vueComponent.props,
                 ...document.vueComponent.computedProps,
                 ...document.vueComponent.datas,
-                ...document.vueComponent.methods
+                ...document.vueComponent.methods,
             ];
             const predefineList = propertyList.map(getPropertyName);
             const { render, position } = compileTemplate2Render(

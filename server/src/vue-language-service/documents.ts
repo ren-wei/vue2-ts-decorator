@@ -4,13 +4,13 @@ import {
     TextDocumentContentChangeEvent,
     TextDocuments,
     TextDocumentsConfiguration,
-    TextEdit
-} from 'vscode-languageserver';
-import { TextDocument } from 'vscode-languageserver-textdocument';
+    TextEdit,
+} from "vscode-languageserver";
+import { TextDocument } from "vscode-languageserver-textdocument";
 import { HTMLDocument } from "vscode-html-languageservice";
-import { getServicesHost } from './host';
-import { VueComponent } from './parse';
-import { PositionManager } from './position';
+import { getServicesHost } from "./host";
+import { VueComponent } from "./parse";
+import { PositionManager } from "./position";
 
 /** 基于 @see TextDocuments 扩展，提供操作 @see VueTextDocument 的方法 */
 export default class VueTextDocuments extends TextDocuments<VueTextDocument> {
@@ -34,13 +34,13 @@ export const VueTextDocument = {
 
     applyEdits(document: TextDocument, edits: TextEdit[]): string {
         return TextDocument.applyEdits(document, edits);
-    }
+    },
 };
 
 /** 基于 TextDocument 扩展，包含 vue 文件所需的信息 */
 export interface VueTextDocument extends TextDocument {
     /** 文本解析出来的 html 文档 */
-	htmlDocument: HTMLDocument;
+    htmlDocument: HTMLDocument;
     /** 文本解析出来的 vue 组件信息 */
     vueComponent: VueComponent;
     /** render 函数开始位置 */

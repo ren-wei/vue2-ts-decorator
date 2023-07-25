@@ -1,22 +1,25 @@
 import * as ts from "typescript";
-import { CompletionItem, CompletionItemKind, Diagnostic, Hover, InsertTextFormat } from 'vscode-languageserver';
-import { Position } from 'vscode-languageserver-textdocument';
-import VueTextDocuments, { VueTextDocument } from './documents';
-import { getFileName, getPropertyName, htmlLanguageService } from './host';
-import { TokenType } from 'vscode-html-languageservice';
-import { getNodeTokens } from './parse';
-import { bindingReg } from './compile';
+import { CompletionItem, CompletionItemKind, Diagnostic, Hover, InsertTextFormat } from "vscode-languageserver";
+import { Position } from "vscode-languageserver-textdocument";
+import VueTextDocuments, { VueTextDocument } from "./documents";
+import { getFileName, getPropertyName, htmlLanguageService } from "./host";
+import { TokenType } from "vscode-html-languageservice";
+import { getNodeTokens } from "./parse";
+import { bindingReg } from "./compile";
 
 /**
  * 获取 vue 文件的语言服务器
- * 
+ *
  * 当文档变更时，需要解析的必要信息
- * 
+ *
  * @param documents 文档管理器
  * @returns 语言服务器
  */
 export default class VueLanguageService {
-    constructor(public documents: VueTextDocuments) {}
+    constructor(public documents: VueTextDocuments) {
+        // TODO:
+        documents;
+    }
 
     /** 获取模版中的诊断信息 */
     public getDiagnostics(document: VueTextDocument): Diagnostic[] {
@@ -31,7 +34,7 @@ export default class VueLanguageService {
                     start: document.positionAt(start),
                     end: document.positionAt(end),
                 },
-                message: diagnostic.messageText.toString()
+                message: diagnostic.messageText.toString(),
             };
         });
     }
@@ -64,7 +67,7 @@ export default class VueLanguageService {
         const offset = document.offsetAt(position);
         const node = document.htmlDocument.findNodeAt(offset);
         const { scanner, tokens } = getNodeTokens(document, node, offset);
-        switch(scanner.getTokenType()) {
+        switch (scanner.getTokenType()) {
             case TokenType.StartTag:
                 const tag = (scanner.getTokenText());
                 if (document.vueComponent.components.find(c => c.name === tag)) {
@@ -87,7 +90,7 @@ export default class VueLanguageService {
                 // 左侧
                 let rightMarkIndex = content.lastIndexOf("}}", index);
                 let leftMarkIndex = content.lastIndexOf("{{", index);
-                const leftValid =  leftMarkIndex !== -1 && leftMarkIndex > rightMarkIndex;
+                const leftValid = leftMarkIndex !== -1 && leftMarkIndex > rightMarkIndex;
                 // 右侧
                 if (leftValid) {
                     rightMarkIndex = content.indexOf("}}", index);
@@ -114,7 +117,7 @@ export default class VueLanguageService {
             const start = document.position.positionAtSource(quickInfo.textSpan.start);
             const end = start + quickInfo.textSpan.length;
             const first = quickInfo.displayParts[0];
-            if (first.kind === 'keyword' && first.text === "const") {
+            if (first.kind === "keyword" && first.text === "const") {
                 const name = document.getText().slice(start, end);
                 const { model, props, computedProps, datas, methods } = document.vueComponent;
                 let type = "";
@@ -143,12 +146,12 @@ export default class VueLanguageService {
                     end: document.positionAt(end),
                 },
                 contents: [
-                    ...(quickInfo.documentation || []).map(item => ({ language: item.kind, value: item.text})),
+                    ...(quickInfo.documentation || []).map(item => ({ language: item.kind, value: item.text })),
                     {
                         language: "js",
-                        value: content
-                    }
-                ]
+                        value: content,
+                    },
+                ],
             };
         }
         return null;
@@ -170,11 +173,11 @@ export default class VueLanguageService {
             const completionList = completionInfoList.entries
                 .filter(item => [
                     ts.ScriptElementKind.constElement,
-                    ts.ScriptElementKind.memberVariableElement
+                    ts.ScriptElementKind.memberVariableElement,
                 ].includes(item.kind));
             return completionList.map(item => ({
                 label: item.name,
-                kind: tsKind2CompletionItemKind(item.kind)
+                kind: tsKind2CompletionItemKind(item.kind),
             }));
         }
         return [];
@@ -197,7 +200,7 @@ export default class VueLanguageService {
             insertTextFormat: InsertTextFormat.Snippet,
             textEdit: {
                 range: { start, end },
-                newText: `<${c.name}>$0</${c.name}>`
+                newText: `<${c.name}>$0</${c.name}>`,
             },
         }));
     }
@@ -242,7 +245,7 @@ function tsKind2CompletionItemKind(kind: ts.ScriptElementKind): CompletionItemKi
         [ts.ScriptElementKind.unknown]: CompletionItemKind.Text,
         [ts.ScriptElementKind.variableElement]: CompletionItemKind.Variable,
         [ts.ScriptElementKind.warning]: CompletionItemKind.Text,
-        [ts.ScriptElementKind.jsxAttribute]: CompletionItemKind.Field
+        [ts.ScriptElementKind.jsxAttribute]: CompletionItemKind.Field,
     }[kind];
 }
 

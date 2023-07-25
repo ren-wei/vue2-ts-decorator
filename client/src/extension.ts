@@ -1,37 +1,37 @@
-import * as path from 'path';
-import { workspace, ExtensionContext } from 'vscode';
+import * as path from "path";
+import { workspace, ExtensionContext } from "vscode";
 
 import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
-    TransportKind
-} from 'vscode-languageclient/node';
+    TransportKind,
+} from "vscode-languageclient/node";
 
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
     const serverModule = context.asAbsolutePath(
-        path.join('server', 'out', 'server.js')
+        path.join("server", "out", "server.js")
     );
-    const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+    const debugOptions = { execArgv: ["--nolazy", "--inspect=6009"] };
     const serverOptions: ServerOptions = {
         run: { module: serverModule, transport: TransportKind.ipc },
         debug: {
             module: serverModule,
             transport: TransportKind.ipc,
-            options: debugOptions
-        }
+            options: debugOptions,
+        },
     };
 
     const clientOptions: LanguageClientOptions = {
-        documentSelector: [{ scheme: 'file', language: 'vue' }],
+        documentSelector: [{ scheme: "file", language: "vue" }],
     };
 
     // Create the language client and start the client.
     client = new LanguageClient(
-        'VueTSDecoratorLSP',
-        'Vue TS Decorator LSP',
+        "VueTSDecoratorLSP",
+        "Vue TS Decorator LSP",
         serverOptions,
         clientOptions
     );
