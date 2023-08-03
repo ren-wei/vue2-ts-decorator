@@ -1,17 +1,19 @@
 {
     "name": "vue2-ts-decorator",
-    "description": "A language server example",
-    "author": "Microsoft Corporation",
+    "description": "Support Vue2's Typescript decorator-style plugin.",
     "license": "MIT",
     "version": "0.1.0",
     "repository": {
         "type": "git",
         "url": "https://github.com/Microsoft/vscode-extension-samples"
     },
-    "publisher": "vscode-samples",
+    "publisher": "ren-wei",
     "categories": [],
     "keywords": [
-        "multi-root ready"
+        "vue-property-decorator",
+        "vue2",
+        "typescript",
+        "decorator"
     ],
     "engines": {
         "vscode": "^1.74.0"
@@ -20,31 +22,7 @@
         "onLanguage:vue"
     ],
     "main": "./client/out/extension",
-    "contributes": {
-        "configuration": {
-            "type": "object",
-            "title": "Example configuration",
-            "properties": {
-                "languageServerExample.maxNumberOfProblems": {
-                    "scope": "resource",
-                    "type": "number",
-                    "default": 100,
-                    "description": "Controls the maximum number of problems produced by the server."
-                },
-                "languageServerExample.trace.server": {
-                    "scope": "window",
-                    "type": "string",
-                    "enum": [
-                        "off",
-                        "messages",
-                        "verbose"
-                    ],
-                    "default": "off",
-                    "description": "Traces the communication between VS Code and the language server."
-                }
-            }
-        }
-    },
+    "contributes": {},
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -b",
