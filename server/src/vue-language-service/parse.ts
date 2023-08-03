@@ -1,20 +1,15 @@
 import * as ts from "typescript";
-import { Node, TokenType } from "vscode-html-languageservice";
-import { VueTextDocument } from './documents';
-import { htmlLanguageService } from './host';
+import { VueComponent, VueModel, VueProp } from "./component";
 
 /** 解析 Vue 组件，获取 vue 组成部分 */
 export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
     // 找到组件类
-    const component = sourceFile.statements.find(statement => ts.isClassDeclaration(statement)) as ts.ClassDeclaration;
+    const component = sourceFile.statements.find(isVueClassStatement) as ts.ClassDeclaration;
     // 收集组件 name, jsDocComment, model, props, data, computed 和 method
     let name = "default";
     let jsDocComment: string[] = [];
-    let model = null as ts.PropertyDeclaration | null;
-    const props: ts.PropertyDeclaration[] = [];
-    const computedProps: ts.GetAccessorDeclaration[] = [];
-    const datas: ts.PropertyDeclaration[] = [];
-    const methods: ts.MethodDeclaration[] = [];
+    let modelProperty = null as ts.PropertyDeclaration | null;
+    let propertyList: ts.PropertyDeclaration[] = [];
     if (component) {
         if (component.name) {
             name = component.name.escapedText.toString();
@@ -23,113 +18,156 @@ export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
         if (jsDoc) {
             jsDocComment = jsDoc.map(v => typeof v.comment === "string" ? v.comment : "");
         }
-        component.members.forEach(member => {
-            if (member.kind === ts.SyntaxKind.PropertyDeclaration) {
-                const property = member as ts.PropertyDeclaration;
-                // 带有装饰器的属性是 model 或 props
-                const decorators = (property.modifiers || [])
-                    .filter(modifier => ts.isDecorator(modifier)) as ts.Decorator[];
-                if (decorators.length) {
-                    decorators.forEach(decorator => {
-                        if (decorator.expression.kind === ts.SyntaxKind.CallExpression) {
-                            const callExpression = decorator.expression as ts.CallExpression;
-                            if (callExpression.expression.kind === ts.SyntaxKind.Identifier) {
-                                const identifier = callExpression.expression as ts.Identifier;
-                                if (identifier.escapedText === "Model") {
-                                    model = property;
-                                } else if (identifier.escapedText === "Prop") {
-                                    props.push(property);
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    datas.push(property);
-                }
-            } else if (member.kind === ts.SyntaxKind.GetAccessor) {
-                computedProps.push(member as ts.GetAccessorDeclaration);
-            } else if (member.kind === ts.SyntaxKind.MethodDeclaration) {
-                methods.push(member as ts.MethodDeclaration);
-            }
-        });
+        modelProperty = filterProperty(component.members || [], "Model")[0] || null;
+        propertyList = filterProperty(component.members || [], "Prop");
     }
+    const props = propertyList.map(getVueProp);
+    const model = getVueModel(modelProperty);
+    return { uri: sourceFile.fileName, name, jsDocComment, model, props };
+}
+
+/** 获取注册的组件 */
+export function getComponentsPath(sourceFile: ts.SourceFile): { name: string, path: string }[] {
     // 收集注册的组件
-    const importComponents: RegisteredVueComponent[] = [];
+    const importComponents: Record<string, string> = {}; // [name]: path
     sourceFile.statements
         .forEach(s => {
             if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier)) {
                 if (s.moduleSpecifier.text.endsWith(".vue")) {
-                    importComponents.push({
-                        name: s.importClause?.name?.escapedText.toString() || "",
-                        path: s.moduleSpecifier.text
-                    });
-                }
-            }
-        });
-    const decorator = component.modifiers?.find(m => ts.isDecorator(m)) as ts.Decorator;
-    const components: RegisteredVueComponent[] = [];
-    if (decorator) {
-        if (ts.isCallExpression(decorator.expression)) {
-            const identifier = decorator.expression.expression;
-            if (ts.isIdentifier(identifier) && identifier.escapedText.toString() === "Component") {
-                const objectLiteral = decorator.expression.arguments[0];
-                if (ts.isObjectLiteralExpression(objectLiteral)) {
-                    const componentsProperty = objectLiteral.properties.find(p => {
-                        if (p.name && ts.isIdentifier(p.name)) {
-                            return  p.name.escapedText.toString() === "components";
-                        }
-                        return false;
-                    });
-                    if (componentsProperty && ts.isPropertyAssignment(componentsProperty)) {
-                        if (ts.isObjectLiteralExpression(componentsProperty.initializer)) {
-                            componentsProperty.initializer.properties.forEach(p => {
-                                if (ts.isShorthandPropertyAssignment(p)) {
-                                    const name = p.name.escapedText.toString();
-                                    const path = importComponents.find(v => v.name === name)?.path;
-                                    if (path) {
-                                        components.push({ name, path });
-                                    }
-                                }
-                            });
-                        }
+                    const name = s.importClause?.name?.escapedText.toString();
+                    if (name) {
+                        importComponents[name] = s.moduleSpecifier.text;
                     }
                 }
             }
+        });
+    const component = sourceFile.statements.find(isVueClassStatement) as ts.ClassDeclaration;
+    if (!component) {
+        return [];
+    }
+    const decorator = component.modifiers?.find(m => ts.isDecorator(m)) as ts.Decorator;
+    if (!decorator) {
+        return [];
+    }
+    const components: { name: string, path: string }[] = [];
+    const params = getDecoratorArguments(decorator)[0];
+    if (params && ts.isObjectLiteralExpression(params)) {
+        const componentsDeclaration = getObjectLiteralExpressionValue(params, "components");
+        if (componentsDeclaration && ts.isObjectLiteralExpression(componentsDeclaration)) {
+            componentsDeclaration.properties.forEach(property => {
+                if (ts.isShorthandPropertyAssignment(property)) {
+                    const name = property.name.escapedText.toString();
+                    const path = importComponents[name];
+                    if (path) {
+                        components.push({ name, path });
+                    }
+                }
+            });
         }
     }
-    return { name, jsDocComment, model, props, computedProps, datas, methods, components };
+    return components;
 }
 
-/** 解析 html 节点，获取 token 和当前所在的 token 的 scanner */
-export function getNodeTokens(document: VueTextDocument, node: Node, offset: number) {
-    const content = document.getText().slice(node.start, node.end);
-    const scanner = htmlLanguageService.createScanner(content);
-    const tokens: string[] = [];
-    let token = scanner.scan();
-    while(token !== TokenType.EOS) {
-        tokens.push(scanner.getTokenText());
-        if (scanner.getTokenOffset() + scanner.getTokenLength() > offset - node.start) {
-            break;
-        }
-        token = scanner.scan();
+/** 是否是 vue 组件类声明 */
+function isVueClassStatement(statement: ts.Statement): boolean {
+    if (ts.isClassDeclaration(statement)) {
+        return statement.modifiers?.some(v => v.kind === ts.SyntaxKind.DefaultKeyword) || false;
     }
-    return { scanner, tokens };
+    return false;
 }
 
-/** 组件基本信息 */
-export interface VueComponent {
-    name: string;
-    jsDocComment: string[];
-	model: ts.PropertyDeclaration | null;
-    props: ts.PropertyDeclaration[];
-    computedProps: ts.GetAccessorDeclaration[];
-    datas: ts.PropertyDeclaration[];
-    methods: ts.MethodDeclaration[];
-    components: RegisteredVueComponent[];
+/** 过滤出需要的属性 */
+function filterProperty(members: ts.NodeArray<ts.ClassElement>, decoratorName: string) {
+    return members.filter(member => {
+        if (ts.isPropertyDeclaration(member)) {
+            const property = member;
+            // 找到装饰器
+            const decorators = (property.modifiers || [])
+                .filter(modifier => ts.isDecorator(modifier)) as ts.Decorator[];
+            if (decorators.length) {
+                // 是否存在与提供的名称相等的装饰器
+                return decorators.some(decorator => {
+                    if (decorator.expression.kind === ts.SyntaxKind.CallExpression) {
+                        const callExpression = decorator.expression as ts.CallExpression;
+                        if (callExpression.expression.kind === ts.SyntaxKind.Identifier) {
+                            const identifier = callExpression.expression as ts.Identifier;
+                            return identifier.escapedText === decoratorName;
+                        }
+                    }
+                });
+            }
+        }
+        return false;
+    }) as ts.PropertyDeclaration[];
 }
 
-/** 注册的组件 */
-export interface RegisteredVueComponent {
-    name: string;
-    path: string;
+function getVueProp(property: ts.PropertyDeclaration): VueProp {
+    let name = "";
+    if (ts.isIdentifier(property.name)) {
+        name = property.name.escapedText.toString();
+    }
+    let type = "unknown";
+    let required: boolean | "unknown" = false;
+    const decorator = property.modifiers?.find(v => v.kind === ts.SyntaxKind.Decorator) as ts.Decorator;
+    const params = getDecoratorArguments(decorator)[0];
+    if (params && ts.isObjectLiteralExpression(params)) {
+        const typeParam = findPropertyAssignment(params, "type");
+        if (typeParam) {
+            if (ts.isIdentifier(typeParam.initializer)) {
+                type = typeParam.initializer.escapedText.toString();
+            }
+        }
+        const requiredParam = findPropertyAssignment(params, "required");
+        if (requiredParam) {
+            if (requiredParam.initializer.kind === ts.SyntaxKind.TrueKeyword) {
+                required = true;
+            } else if (requiredParam.initializer.kind === ts.SyntaxKind.FalseKeyword) {
+                required = false;
+            } else {
+                required = "unknown";
+            }
+        }
+    }
+    const jsDocComment = ((property as ts.PropertyDeclaration & { jsDoc?: ts.JSDoc[] }).jsDoc || []).map(v => v.comment?.toString() || "").filter(Boolean);
+    return { name, type, required, jsDocComment };
+}
+
+function getVueModel(modelProperty: ts.PropertyDeclaration | null): VueModel | null {
+    if (!modelProperty) {
+        return null;
+    }
+    let event = "";
+    const decorator = modelProperty.modifiers?.find(v => v.kind === ts.SyntaxKind.Decorator) as ts.Decorator;
+    const eventParam = getDecoratorArguments(decorator)[0];
+    if (eventParam && ts.isStringLiteral(eventParam)) {
+        event = eventParam.text;
+    }
+    return { event, ...getVueProp(modelProperty) };
+}
+
+/** 获取装饰器函数的参数 */
+function getDecoratorArguments(decorator: ts.Decorator): ts.Expression[] {
+    if (decorator && ts.isCallExpression(decorator.expression)) {
+        return [...decorator.expression.arguments];
+    }
+    return [];
+}
+
+/** 从对象字面量表达式中获取对应 key 的属性 */
+function findPropertyAssignment(params: ts.ObjectLiteralExpression, key: string) {
+    return params.properties.find(p => ts.isPropertyAssignment(p) && p.name && ts.isIdentifier(p.name) && p.name.escapedText.toString() === key) as ts.PropertyAssignment | undefined;
+}
+
+/** 获取对象字面量的key对应的值 */
+function getObjectLiteralExpressionValue(objectLiteral: ts.ObjectLiteralExpression, key: string) {
+    const componentsProperty = objectLiteral.properties.find(p => {
+        if (p.name && ts.isIdentifier(p.name)) {
+            return p.name.escapedText.toString() === key;
+        }
+        return false;
+    });
+    if (componentsProperty && ts.isPropertyAssignment(componentsProperty)) {
+        return componentsProperty.initializer;
+    }
+    return null;
 }

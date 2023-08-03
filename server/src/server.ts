@@ -8,10 +8,10 @@ import {
     TextDocumentSyncKind,
     InitializeResult,
     HoverParams,
+    TextDocuments,
 } from "vscode-languageserver/node";
 import VueLanguageService from "./vue-language-service";
-import VueTextDocuments, { VueTextDocument } from "./vue-language-service/documents";
-import { getUri } from "./vue-language-service/host";
+import { TextDocument } from "vscode-languageserver-textdocument";
 
 const connection = createConnection(ProposedFeatures.all);
 
@@ -42,8 +42,7 @@ connection.onInitialize((params: InitializeParams) => {
             textDocumentSync: TextDocumentSyncKind.Incremental,
             // Tell the client that this server supports code completion.
             completionProvider: {
-                triggerCharacters: ["."],
-                resolveProvider: true,
+                triggerCharacters: [":"],
             },
             hoverProvider: true,
         },
@@ -58,7 +57,7 @@ connection.onInitialize((params: InitializeParams) => {
     return result;
 });
 
-connection.onInitialized(() => {
+connection.onInitialized(async() => {
     if (hasConfigurationCapability) {
         // Register for all configuration changes.
         connection.client.register(DidChangeConfigurationNotification.type, undefined);
@@ -68,47 +67,30 @@ connection.onInitialized(() => {
             connection.console.log("Workspace folder change event received.");
         });
     }
+    const workspaceFolders = await connection.workspace.getWorkspaceFolders();
+    const vueLanguageService = new VueLanguageService(documents, workspaceFolders);
+
+    connection.onHover(
+        (params: HoverParams) => {
+            const document = documents.get(params.textDocument.uri);
+            if (document) {
+                return vueLanguageService.doHover(document, params.position);
+            }
+        }
+    );
+
+    connection.onCompletion(
+        (params: TextDocumentPositionParams): CompletionItem[] => {
+            const document = documents.get(params.textDocument.uri);
+            if (document) {
+                return vueLanguageService.doComplete(document, params.position);
+            }
+            return [];
+        }
+    );
 });
 
-connection.onHover(
-    (params: HoverParams) => {
-        const document = documents.get(getUri(params.textDocument.uri));
-        if (document) {
-            return vueLanguageService.doHover(document, params.position);
-        }
-    }
-);
-
-connection.onCompletion(
-    (params: TextDocumentPositionParams): CompletionItem[] => {
-        const document = documents.get(getUri(params.textDocument.uri));
-        if (document) {
-            return vueLanguageService.doComplete(document, params.position);
-        }
-        return [];
-    }
-);
-
-connection.onCompletionResolve(
-    (item: CompletionItem): CompletionItem => {
-        return item;
-    }
-);
-
-const documents = new VueTextDocuments(VueTextDocument);
-documents.onDidChangeContent(({ document }) => {
-    validateDocument(document);
-});
+const documents = new TextDocuments(TextDocument);
 documents.listen(connection);
 
 connection.listen();
-
-const vueLanguageService = new VueLanguageService(documents);
-
-function validateDocument(document: VueTextDocument) {
-    const diagnostics = vueLanguageService.getDiagnostics(document);
-    connection.sendDiagnostics({
-        uri: document.uri,
-        diagnostics,
-    });
-}

@@ -1,16 +1,9 @@
 # 代码设计思路
 
-`VueLanguageService` 提供语法服务器需要的所有功能
+`VueLanguageService` 提供语法服务器需要的所有功能，仅对 vetur 未提供的功能做补充
 
-* 将 template 编译为 render 函数得到虚拟的 ts 文件和文件位置映射
+1. 解析当前文件，找到引入的 vue 组件
 
-```html
-<template>
-  <div id="app">
-    <img alt="Vue logo" src="./assets/logo.png">
-    <HelloWorld :msg="msg"/>
-  </div>
-</template>
-```
+2. 获取 vue 组件的文档注释，属性（包含类型、是否必填），事件（仅包含声明的事件）
 
-编译为(格式化后):
+3. 当文件变化时，仅重新解析当前文件，引入的组件不需要再次解析
