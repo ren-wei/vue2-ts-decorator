@@ -1,10 +1,11 @@
+import * as path from "path";
+import { existsSync, readFileSync } from "fs";
 import * as ts from "typescript";
 import { TextDocuments, WorkspaceFolder } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { LanguageService as HtmlLanguageService, getLanguageService, HTMLDocument } from "vscode-html-languageservice";
 import { getComponentsPath, parseComponent } from "./parse";
 import { getAbsolutePath, getScriptString, getUri } from "./tools";
-import { existsSync, readFileSync } from "fs";
 
 /**
  * 组件管理器
@@ -12,9 +13,9 @@ import { existsSync, readFileSync } from "fs";
 export class ComponentManager {
     public documents: TextDocuments<TextDocument>;
 
-    public htmlLanguageService: HtmlLanguageService;
-
     public workspaceFolders: WorkspaceFolder[] | null;
+
+    public htmlLanguageService: HtmlLanguageService;
 
     /** 缓存组件，key 是文件的 uri */
     private cacheVueComponent = new Map<string, VueComponent>();
@@ -62,7 +63,7 @@ export class ComponentManager {
 
     /**
      * 获取组件
-     * @param path 相对路径或 uri
+     * @param path 路径或 uri
      * @param baseUri 如果是相对路径，那么需要当前文件的 uri
      * @returns 组件信息，如果组件不存在，那么返回 null
      */
@@ -105,7 +106,8 @@ export class ComponentManager {
             return [];
         }
         const htmlDocument = this.getHtmlDocument(document);
-        const pathList = getComponentsPath(this.getSourceFile(document, htmlDocument));
+        const rootPath = this.getRootPath(document.uri) || ".";
+        const pathList = getComponentsPath(this.getSourceFile(document, htmlDocument), rootPath, this.getCompilerOptions(rootPath));
         const components: VueComponent[] = pathList.map(({ name, path }) => {
             const component = this.getVueComponent(path, uri);
             if (component) {
@@ -133,6 +135,28 @@ export class ComponentManager {
         const sourceFile = ts.createSourceFile(document.uri, scriptString, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
         this.cacheSourceFile.set(document.uri, sourceFile);
         return sourceFile;
+    }
+
+    /** 获取文档的根路径，如果不存在根路径，返回 undefined */
+    private getRootPath(uri: string) {
+        const rootUri = this.workspaceFolders?.find(folder => uri.startsWith(folder.uri))?.uri;
+        if (rootUri) {
+            return getAbsolutePath(rootUri);
+        }
+    }
+
+    /** 根据根路径获取编译选项 */
+    private getCompilerOptions(rootPath: string): ts.CompilerOptions {
+        const tsConfigPath = path.resolve(rootPath, "./tsconfig.json");
+        if (existsSync(tsConfigPath)) {
+            const content = readFileSync(tsConfigPath, { encoding: "utf8" });
+            try {
+                return JSON.parse(content).compilerOptions || {};
+            } catch {
+                return {};
+            }
+        }
+        return {};
     }
 }
 

@@ -1,3 +1,5 @@
+import * as path from "path";
+import { existsSync } from "fs";
 import * as ts from "typescript";
 import { VueComponent, VueModel, VueProp } from "./component";
 import { getMarkdownFromJsDoc } from "./tools";
@@ -24,17 +26,24 @@ export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
     return { uri: sourceFile.fileName, name, jsDocComment: getMarkdownFromJsDoc(jsDocComment), model, props };
 }
 
-/** 获取注册的组件 */
-export function getComponentsPath(sourceFile: ts.SourceFile): { name: string, path: string }[] {
+/**
+ * 获取注册的组件
+ * @param sourceFile 源文件
+ * @param rootPath 项目根路径
+ * @param compilerOptions 编译选项
+ * @returns 包含组件名和组件路径的列表。组件路径如果是别名，会被解析成绝对路径
+ */
+export function getComponentsPath(sourceFile: ts.SourceFile, rootPath: string, compilerOptions: ts.CompilerOptions): { name: string, path: string }[] {
     // 收集注册的组件
     const importComponents: Record<string, string> = {}; // [name]: path
+    const getPath = parseAliasPath(rootPath, compilerOptions);
     sourceFile.statements
         .forEach(s => {
             if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier)) {
                 if (s.moduleSpecifier.text.endsWith(".vue")) {
                     const name = s.importClause?.name?.escapedText.toString();
                     if (name) {
-                        importComponents[name] = s.moduleSpecifier.text;
+                        importComponents[name] = getPath(s.moduleSpecifier.text);
                     }
                 }
             }
@@ -168,4 +177,34 @@ function getObjectLiteralExpressionValue(objectLiteral: ts.ObjectLiteralExpressi
         return componentsProperty.initializer;
     }
     return null;
+}
+
+/** 解析路径别名 */
+function parseAliasPath(rootPath: string, compilerOptions: ts.CompilerOptions) {
+    const baseUrl = compilerOptions.baseUrl || ".";
+    const paths = compilerOptions.paths || {};
+    const mapping = Object.fromEntries(Object.entries(paths).map(([alias, list]) => {
+        // 转化为相对路径
+        list = list.map(item => item.startsWith(".") ? item : `./${item}`);
+        // 相对路径转换为绝对路径
+        list = list.map(item => path.resolve(rootPath, baseUrl, item));
+        // 去掉末尾星号
+        list = list.map(item => item.replace(/\*$/, ""));
+        return [alias.replace(/\*$/, ""), list];
+    }));
+    return (rawPath: string) => {
+        const alias = Object.keys(mapping).find(alias => rawPath.startsWith(alias));
+        if (!alias) {
+            return rawPath;
+        }
+        const list = mapping[alias];
+        for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            const newPath = `${item}${rawPath.slice(alias.length)}`;
+            if (existsSync(newPath)) {
+                return newPath;
+            }
+        }
+        return rawPath;
+    };
 }

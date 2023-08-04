@@ -1,15 +1,19 @@
 import { resolve } from "path";
 import * as ts from "typescript";
 import { HTMLDocument, TextDocument } from "vscode-html-languageservice";
-import { MarkupContent } from "vscode-languageserver";
 
 /** 获取绝对路径 */
 export function getAbsolutePath(uri: string): string {
     return uri.replace("file://", "");
 }
 
-/** 根据相对路径获取 uri */
+/** 根据路径获取 uri */
 export function getUri(path: string, baseUri?: string): string {
+    // 绝对路径
+    if (path.startsWith("/") || /^\w:/.test(path)) {
+        return `file://${path}`;
+    }
+    // 相对路径
     if (baseUri) {
         return "file://" + resolve(getAbsolutePath(baseUri), "..", path);
     }
