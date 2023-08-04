@@ -114,7 +114,7 @@ export class ComponentManager {
                 return {
                     uri: getUri(path, uri),
                     name,
-                    jsDocComment: [],
+                    jsDocComment: "",
                     model: null,
                     props: [],
                 };
@@ -140,7 +140,7 @@ export class ComponentManager {
 export interface VueComponent {
     uri: string;
     name: string;
-    jsDocComment: string[];
+    jsDocComment: string;
     model: VueModel | null;
     props: VueProp[];
 }
@@ -150,7 +150,7 @@ export interface VueProp {
     name: string;
     type: string;
     required: boolean | "unknown";
-    jsDocComment: string[];
+    jsDocComment: string;
 }
 
 /** 组件 model */

@@ -1,5 +1,7 @@
 import { resolve } from "path";
+import * as ts from "typescript";
 import { HTMLDocument, TextDocument } from "vscode-html-languageservice";
+import { MarkupContent } from "vscode-languageserver";
 
 /** 获取绝对路径 */
 export function getAbsolutePath(uri: string): string {
@@ -26,4 +28,23 @@ export function getScriptString(document: TextDocument, htmlDocument: HTMLDocume
         return document.getText().slice(node.startTagEnd, node.endTagStart);
     }
     return "";
+}
+
+/** 将 JSDoc 格式转换为 markdown */
+export function getMarkdownFromJsDoc(jsDocs: ts.JSDoc[]): string {
+    return jsDocs.map(jsDoc => {
+        const comment = jsDoc.comment || "";
+        const tags = jsDoc.tags || [];
+        let markdown = `${comment}\n\n`;
+        tags.forEach(tag => {
+            if (ts.isJSDocParameterTag(tag)) {
+                if (ts.isIdentifier(tag.name)) {
+                    markdown += `*@${tag.tagName.escapedText}* \` ${tag.name.escapedText} \` -- ${tag.comment || ""}`;
+                }
+            } else {
+                markdown += `*@${tag.tagName.escapedText}* -- ${tag.comment || ""}`;
+            }
+        });
+        return markdown;
+    }).join("\n");
 }

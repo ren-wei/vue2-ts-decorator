@@ -1,5 +1,6 @@
 import * as ts from "typescript";
 import { VueComponent, VueModel, VueProp } from "./component";
+import { getMarkdownFromJsDoc } from "./tools";
 
 /** 解析 Vue 组件，获取 vue 组成部分 */
 export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
@@ -7,23 +8,20 @@ export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
     const component = sourceFile.statements.find(isVueClassStatement) as ts.ClassDeclaration;
     // 收集组件 name, jsDocComment, model, props, data, computed 和 method
     let name = "default";
-    let jsDocComment: string[] = [];
+    let jsDocComment: ts.JSDoc[] = [];
     let modelProperty = null as ts.PropertyDeclaration | null;
     let propertyList: ts.PropertyDeclaration[] = [];
     if (component) {
         if (component.name) {
             name = component.name.escapedText.toString();
         }
-        const jsDoc = (component as ts.ClassDeclaration & { jsDoc?: ts.JSDoc[] }).jsDoc;
-        if (jsDoc) {
-            jsDocComment = jsDoc.map(v => typeof v.comment === "string" ? v.comment : "");
-        }
+        jsDocComment = (component as ts.ClassDeclaration & { jsDoc?: ts.JSDoc[] }).jsDoc || [];
         modelProperty = filterProperty(component.members || [], "Model")[0] || null;
         propertyList = filterProperty(component.members || [], "Prop");
     }
     const props = propertyList.map(getVueProp);
     const model = getVueModel(modelProperty);
-    return { uri: sourceFile.fileName, name, jsDocComment, model, props };
+    return { uri: sourceFile.fileName, name, jsDocComment: getMarkdownFromJsDoc(jsDocComment), model, props };
 }
 
 /** 获取注册的组件 */
@@ -128,8 +126,8 @@ function getVueProp(property: ts.PropertyDeclaration): VueProp {
             }
         }
     }
-    const jsDocComment = ((property as ts.PropertyDeclaration & { jsDoc?: ts.JSDoc[] }).jsDoc || []).map(v => v.comment?.toString() || "").filter(Boolean);
-    return { name, type, required, jsDocComment };
+    const jsDocComment = ((property as ts.PropertyDeclaration & { jsDoc?: ts.JSDoc[] }).jsDoc || []);
+    return { name, type, required, jsDocComment: getMarkdownFromJsDoc(jsDocComment) };
 }
 
 function getVueModel(modelProperty: ts.PropertyDeclaration | null): VueModel | null {

@@ -39,30 +39,42 @@ export default class VueLanguageService {
                 case VueTokenType.ComponentName:
                     return {
                         range,
-                        contents: [...component.jsDocComment, {
-                            language: "javascript",
-                            value: `(Component) ${tag}: class ${tag}`,
-                        }],
+                        contents: {
+                            kind: "markdown",
+                            value: [
+                                "```typescript",
+                                `class ${tag}`,
+                                "```",
+                                component.jsDocComment,
+                            ].join("\n"),
+                        },
                     };
                 case VueTokenType.AttributeName:
                     const attribute = text.replace(/^:/, "");
                     if (component.model && (attribute === "v-model" || component.model?.name === attribute)) {
                         return {
                             range,
-                            contents: [...component.model.jsDocComment, {
-                                language: "javascript",
-                                value: `(model) ${attribute}: ${component.model.type}`,
-                            }],
+                            contents: {
+                                kind: "markdown",
+                                value: [
+                                    "```typescript",
+                                    `(model) ${attribute}: ${component.model.type}`,
+                                    "```",
+                                    component.model.jsDocComment,
+                                ].join("\n"),
+                            },
                         };
                     }
                     const prop = component.props.find(v => v.name === attribute);
                     if (prop) {
                         return {
                             range,
-                            contents: [...prop.jsDocComment, {
-                                language: "javascript",
-                                value: `(prop) ${attribute}: ${prop.type}`,
-                            }],
+                            contents: [
+                                "```typescript",
+                                `(prop) ${attribute}: ${prop.type}`,
+                                "```",
+                                prop.jsDocComment,
+                            ].join("\n"),
                         };
                     }
                     break;
@@ -133,7 +145,10 @@ export default class VueLanguageService {
                 range: { start, end },
                 newText: `<${c.name}>$0</${c.name}>`,
             },
-            documentation: c.jsDocComment.join("\n"),
+            documentation: {
+                kind: "markdown",
+                value: c.jsDocComment,
+            },
         }));
     }
 
@@ -159,7 +174,10 @@ export default class VueLanguageService {
                     },
                     newText: `:${prop.name}="$0"`,
                 },
-                documentation: prop.jsDocComment.join("\n"),
+                documentation: {
+                    kind: "markdown" as "markdown",
+                    value: prop.jsDocComment,
+                },
             })).filter(item => !attrs.find(v => v.replace(/^:/, "") === item.label));
         }
         return [];
