@@ -9,6 +9,8 @@ import {
     InitializeResult,
     HoverParams,
     TextDocuments,
+    Definition,
+    DefinitionParams,
 } from "vscode-languageserver/node";
 import VueLanguageService from "./vue-language-service";
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -45,6 +47,7 @@ connection.onInitialize((params: InitializeParams) => {
                 triggerCharacters: [":"],
             },
             hoverProvider: true,
+            definitionProvider: true,
         },
     };
     if (hasWorkspaceFolderCapability) {
@@ -88,7 +91,35 @@ connection.onInitialized(async() => {
             return [];
         }
     );
+
+    connection.onDefinition(
+        (params: DefinitionParams): Definition => {
+            const document = documents.get(params.textDocument.uri);
+            if (document) {
+                return vueLanguageService.doDefinition(document, params.position);
+            }
+            return [];
+        }
+    );
 });
+
+connection.onHover(
+    (params: HoverParams) => {
+        return null;
+    }
+);
+
+connection.onCompletion(
+    (params: TextDocumentPositionParams): CompletionItem[] => {
+        return [];
+    }
+);
+
+connection.onDefinition(
+    (params: DefinitionParams): Definition => {
+        return [];
+    }
+);
 
 const documents = new TextDocuments(TextDocument);
 documents.listen(connection);

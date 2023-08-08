@@ -1,11 +1,10 @@
-import * as path from "path";
 import { existsSync, readFileSync } from "fs";
 import * as ts from "typescript";
 import { TextDocuments, WorkspaceFolder } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { LanguageService as HtmlLanguageService, getLanguageService, HTMLDocument } from "vscode-html-languageservice";
 import { getComponentsPath, parseComponent } from "./parse";
-import { getAbsolutePath, getScriptString, getUri } from "./tools";
+import { getAbsolutePath, getScriptString, getUri, resolvePath } from "./tools";
 
 /**
  * 组件管理器
@@ -147,7 +146,7 @@ export class ComponentManager {
 
     /** 根据根路径获取编译选项 */
     private getCompilerOptions(rootPath: string): ts.CompilerOptions {
-        const tsConfigPath = path.resolve(rootPath, "./tsconfig.json");
+        const tsConfigPath = resolvePath(rootPath, "./tsconfig.json");
         if (existsSync(tsConfigPath)) {
             const content = readFileSync(tsConfigPath, { encoding: "utf8" });
             try {

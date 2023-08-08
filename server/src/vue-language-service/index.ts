@@ -1,4 +1,4 @@
-import { CompletionItem, CompletionItemKind, Diagnostic, Hover, InsertTextFormat, TextDocuments, WorkspaceFolder } from "vscode-languageserver";
+import { CompletionItem, CompletionItemKind, Definition, Diagnostic, Hover, InsertTextFormat, TextDocuments, WorkspaceFolder } from "vscode-languageserver";
 import { Position, TextDocument } from "vscode-languageserver-textdocument";
 import { Node, HTMLDocument, TokenType } from "vscode-html-languageservice";
 import { ComponentManager } from "./component";
@@ -96,6 +96,16 @@ export default class VueLanguageService {
         return [];
     }
 
+    /** 跳到定义 */
+    public doDefinition(document: TextDocument, position: Position): Definition {
+        const tokenTypeResult = this.getVueTokenType(document, position);
+        switch (tokenTypeResult.type) {
+            case VueTokenType.ComponentName:
+                return this.getDefinitionFromComponentName(document, tokenTypeResult);
+        }
+        return [];
+    }
+
     /** 获取当前所处的位置类型 */
     private getVueTokenType(document: TextDocument, position: Position): VueTokenTypeResult {
         const offset = document.offsetAt(position);
@@ -179,6 +189,19 @@ export default class VueLanguageService {
                     value: prop.jsDocComment,
                 },
             })).filter(item => !attrs.find(v => v.replace(/^:/, "") === item.label));
+        }
+        return [];
+    }
+
+    private getDefinitionFromComponentName(document: TextDocument, tokenTypeResult: VueTokenTypeResult): Definition {
+        const { tag } = tokenTypeResult;
+        const components = this.componentManager.getComponents(document.uri);
+        const component = components.find(v => v.name === tag);
+        if (component) {
+            return {
+                uri: component.uri,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 }},
+            };
         }
         return [];
     }
