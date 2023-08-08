@@ -11,7 +11,7 @@ export function resolvePath(...paths: string[]): string {
 
 /** 获取绝对路径 */
 export function getAbsolutePath(uri: string): string {
-    return uri.replace("file://", "");
+    return uri.replace(/^file:\/\/\/(\w)%3A/, "$1:");
 }
 
 /** 根据路径获取 uri */
