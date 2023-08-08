@@ -1,8 +1,7 @@
-import * as path from "path";
 import { existsSync } from "fs";
 import * as ts from "typescript";
 import { VueComponent, VueModel, VueProp } from "./component";
-import { getMarkdownFromJsDoc } from "./tools";
+import { getMarkdownFromJsDoc, resolvePath } from "./tools";
 
 /** 解析 Vue 组件，获取 vue 组成部分 */
 export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
@@ -187,7 +186,7 @@ function parseAliasPath(rootPath: string, compilerOptions: ts.CompilerOptions) {
         // 转化为相对路径
         list = list.map(item => item.startsWith(".") ? item : `./${item}`);
         // 相对路径转换为绝对路径
-        list = list.map(item => path.resolve(rootPath, baseUrl, item));
+        list = list.map(item => resolvePath(rootPath, baseUrl, item));
         // 去掉末尾星号
         list = list.map(item => item.replace(/\*$/, ""));
         return [alias.replace(/\*$/, ""), list];

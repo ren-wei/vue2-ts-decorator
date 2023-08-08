@@ -2,6 +2,13 @@ import { resolve } from "path";
 import * as ts from "typescript";
 import { HTMLDocument, TextDocument } from "vscode-html-languageservice";
 
+/** 代替 path.resolve */
+export function resolvePath(...paths: string[]): string {
+    paths = paths.map(item => item.replace(/^\/(\w)%3A/, "$1:"));
+    const path = resolve(...paths);
+    return path.replace(/\\/g, "/");
+}
+
 /** 获取绝对路径 */
 export function getAbsolutePath(uri: string): string {
     return uri.replace("file://", "");
@@ -9,13 +16,16 @@ export function getAbsolutePath(uri: string): string {
 
 /** 根据路径获取 uri */
 export function getUri(path: string, baseUri?: string): string {
+    if (/^\w:/.test(path)) {
+        return `file://${path.replace(/^(\w):/, "/$1%3A")}`;
+    }
     // 绝对路径
-    if (path.startsWith("/") || /^\w:/.test(path)) {
+    if (path.startsWith("/")) {
         return `file://${path}`;
     }
     // 相对路径
     if (baseUri) {
-        return "file://" + resolve(getAbsolutePath(baseUri), "..", path);
+        return "file://" + resolvePath(getAbsolutePath(baseUri), "..", path);
     }
     return path;
 }
