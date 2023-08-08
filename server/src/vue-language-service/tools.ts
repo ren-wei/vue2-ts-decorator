@@ -16,16 +16,17 @@ export function getAbsolutePath(uri: string): string {
 
 /** 根据路径获取 uri */
 export function getUri(path: string, baseUri?: string): string {
+    // windows 绝对路径
     if (/^\w:/.test(path)) {
         return `file://${path.replace(/^(\w):/, "/$1%3A")}`;
     }
-    // 绝对路径
+    // 类 linux 绝对路径
     if (path.startsWith("/")) {
         return `file://${path}`;
     }
     // 相对路径
     if (baseUri) {
-        return "file://" + resolvePath(getAbsolutePath(baseUri), "..", path);
+        return getUri(resolvePath(getAbsolutePath(baseUri), "..", path));
     }
     return path;
 }
