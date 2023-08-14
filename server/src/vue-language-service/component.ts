@@ -3,7 +3,7 @@ import * as ts from "typescript";
 import { TextDocuments, WorkspaceFolder } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { LanguageService as HtmlLanguageService, getLanguageService, HTMLDocument } from "vscode-html-languageservice";
-import { getComponentsPath, parseComponent } from "./parse";
+import { getComponentsPath, parseComponent, parseLibraryFile } from "./parse";
 import { getAbsolutePath, getScriptString, getUri, resolvePath } from "./tools";
 
 /**
@@ -62,15 +62,22 @@ export class ComponentManager {
 
     /**
      * 获取组件
+     * @param name 组件名称，如果组件是非默认导出组件，那么需要在路径对应的文件中使用名称进行查找
      * @param path 路径或 uri
      * @param baseUri 如果是相对路径，那么需要当前文件的 uri
      * @returns 组件信息，如果组件不存在，那么返回 null
      */
-    public getVueComponent(path: string, baseUri?: string) {
+    public getVueComponent(name: string, path: string, baseUri?: string) {
         const uri = getUri(path, baseUri);
+        let cacheKey: string;
+        if (uri.endsWith(".vue")) {
+            cacheKey = uri;
+        } else {
+            cacheKey = `${uri}#${name}`;
+        }
         // 从缓存中获取
-        if (this.cacheVueComponent.has(uri)) {
-            return this.cacheVueComponent.get(uri) as VueComponent;
+        if (this.cacheVueComponent.has(cacheKey)) {
+            return this.cacheVueComponent.get(cacheKey) as VueComponent;
         }
         let document = this.documents.get(uri);
         if (!document) {
@@ -78,17 +85,25 @@ export class ComponentManager {
             const absolutePath = getAbsolutePath(uri);
             if (existsSync(absolutePath)) {
                 const content = readFileSync(absolutePath, { encoding: "utf-8" });
-                document = TextDocument.create(uri, "typescript", 1, content);
+                if (absolutePath.endsWith(".vue")) {
+                    document = TextDocument.create(uri, "vue", 1, content);
+                } else {
+                    document = TextDocument.create(uri, "typescript", 1, content);
+                }
             } else {
                 return null;
             }
         }
-        const htmlDocument = this.getHtmlDocument(document);
-        const sourceFile = this.getSourceFile(document, htmlDocument);
+        const sourceFile = this.getSourceFile(document);
         if (sourceFile) {
-            const component = parseComponent(sourceFile);
+            let component: VueComponent;
+            if (document.languageId === "vue") {
+                component = parseComponent(sourceFile);
+            } else {
+                component = parseLibraryFile(sourceFile, name);
+            }
             if (component) {
-                this.cacheVueComponent.set(uri, component);
+                this.cacheVueComponent.set(cacheKey, component);
             }
             return component;
         }
@@ -104,11 +119,10 @@ export class ComponentManager {
         if (!document) {
             return [];
         }
-        const htmlDocument = this.getHtmlDocument(document);
         const rootPath = this.getRootPath(document.uri) || ".";
-        const pathList = getComponentsPath(this.getSourceFile(document, htmlDocument), rootPath, this.getCompilerOptions(rootPath));
+        const pathList = getComponentsPath(this.getSourceFile(document), rootPath, this.getCompilerOptions(rootPath));
         const components: VueComponent[] = pathList.map(({ name, path }) => {
-            const component = this.getVueComponent(path, uri);
+            const component = this.getVueComponent(name, path, uri);
             if (component) {
                 return component;
             } else {
@@ -125,12 +139,18 @@ export class ComponentManager {
         return components;
     }
 
-    private getSourceFile(document: TextDocument, htmlDocument: HTMLDocument): ts.SourceFile {
+    private getSourceFile(document: TextDocument): ts.SourceFile {
         if (this.cacheSourceFile.has(document.uri)) {
             return this.cacheSourceFile.get(document.uri) as ts.SourceFile;
         }
         // 从 documents 获取
-        const scriptString = getScriptString(document, htmlDocument);
+        let scriptString: string;
+        if (document.languageId === "vue") {
+            const htmlDocument = this.getHtmlDocument(document);
+            scriptString = getScriptString(document, htmlDocument);
+        } else {
+            scriptString = document.getText();
+        }
         const sourceFile = ts.createSourceFile(document.uri, scriptString, ts.ScriptTarget.ESNext, false, ts.ScriptKind.TS);
         this.cacheSourceFile.set(document.uri, sourceFile);
         return sourceFile;

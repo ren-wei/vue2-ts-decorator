@@ -1,7 +1,7 @@
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import * as ts from "typescript";
 import { VueComponent, VueModel, VueProp } from "./component";
-import { getMarkdownFromJsDoc, resolvePath } from "./tools";
+import { getAbsolutePath, getMarkdownFromJsDoc, resolvePath } from "./tools";
 
 /** 解析 Vue 组件，获取 vue 组成部分 */
 export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
@@ -25,6 +25,18 @@ export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
     return { uri: sourceFile.fileName, name, jsDocComment: getMarkdownFromJsDoc(jsDocComment), model, props };
 }
 
+/** 从库文件获取组件定义 */
+export function parseLibraryFile(sourceFile: ts.SourceFile, name: string): VueComponent {
+    // TODO: 从库文件获取组件定义
+    return {
+        uri: "",
+        name,
+        jsDocComment: "",
+        model: null,
+        props: [],
+    };
+}
+
 /**
  * 获取注册的组件
  * @param sourceFile 源文件
@@ -33,20 +45,7 @@ export function parseComponent(sourceFile: ts.SourceFile): VueComponent {
  * @returns 包含组件名和组件路径的列表。组件路径如果是别名，会被解析成绝对路径
  */
 export function getComponentsPath(sourceFile: ts.SourceFile, rootPath: string, compilerOptions: ts.CompilerOptions): { name: string, path: string }[] {
-    // 收集注册的组件
-    const importComponents: Record<string, string> = {}; // [name]: path
-    const getPath = parseAliasPath(rootPath, compilerOptions);
-    sourceFile.statements
-        .forEach(s => {
-            if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier)) {
-                if (s.moduleSpecifier.text.endsWith(".vue")) {
-                    const name = s.importClause?.name?.escapedText.toString();
-                    if (name) {
-                        importComponents[name] = getPath(s.moduleSpecifier.text);
-                    }
-                }
-            }
-        });
+    // 获取组件键值映射
     const component = sourceFile.statements.find(isVueClassStatement) as ts.ClassDeclaration;
     if (!component) {
         return [];
@@ -55,7 +54,7 @@ export function getComponentsPath(sourceFile: ts.SourceFile, rootPath: string, c
     if (!decorator) {
         return [];
     }
-    const components: { name: string, path: string }[] = [];
+    const components: { name: string, value: string }[] = [];
     const params = getDecoratorArguments(decorator)[0];
     if (params && ts.isObjectLiteralExpression(params)) {
         const componentsDeclaration = getObjectLiteralExpressionValue(params, "components");
@@ -63,15 +62,45 @@ export function getComponentsPath(sourceFile: ts.SourceFile, rootPath: string, c
             componentsDeclaration.properties.forEach(property => {
                 if (ts.isShorthandPropertyAssignment(property)) {
                     const name = property.name.escapedText.toString();
-                    const path = importComponents[name];
-                    if (path) {
-                        components.push({ name, path });
+                    components.push({ name, value: name });
+                } else if (ts.isPropertyAssignment(property)) {
+                    if (ts.isIdentifier(property.name) && ts.isIdentifier(property.initializer)) {
+                        components.push({
+                            name: property.name.escapedText.toString(),
+                            value: property.initializer.escapedText.toString(),
+                        });
                     }
                 }
             });
         }
     }
-    return components;
+    // 从导入语句获取组件路径
+    const registeredComponents: { name: string; path: string }[] = [];
+    const getPath = parseAliasPath(rootPath, compilerOptions);
+    (sourceFile.statements.filter(s => ts.isImportDeclaration(s)) as ts.ImportDeclaration[])
+        .forEach(s => {
+            if (ts.isStringLiteral(s.moduleSpecifier)) {
+                const path = parsePackagePath(rootPath, getPath(s.moduleSpecifier.text));
+                if (path.endsWith(".vue")) {
+                    const name = s.importClause?.name?.escapedText.toString();
+                    if (name) {
+                        registeredComponents.push({ name, path });
+                    }
+                } else {
+                    const namedImports = s.importClause?.namedBindings;
+                    if (namedImports && ts.isNamedImports(namedImports)) {
+                        namedImports.elements.forEach(element => {
+                            const value = element.name.escapedText.toString();
+                            const name = components.find(v => v.value === value)?.name;
+                            if (name) {
+                                registeredComponents.push({ name, path });
+                            }
+                        });
+                    }
+                }
+            }
+        });
+    return registeredComponents;
 }
 
 /** 是否是 vue 组件类声明 */
@@ -215,4 +244,23 @@ function parseAliasPath(rootPath: string, compilerOptions: ts.CompilerOptions) {
         }
         return rawPath;
     };
+}
+
+/** 解析第三方库路径 */
+function parsePackagePath(rootPath: string, rawPath: string) {
+    if (/^\w/.test(rawPath)) {
+        const pgk = (resolvePath(getAbsolutePath(rootPath), "node_modules", rawPath, "package.json"));
+        // 从 package.json 获取类型定义位置
+        if (existsSync(pgk)) {
+            const content = readFileSync(pgk, { encoding: "utf8" });
+            try {
+                return resolvePath(getAbsolutePath(rootPath), "node_modules", rawPath, JSON.parse(content).typings);
+            } catch {
+                return rawPath;
+            }
+        } else {
+            return rawPath;
+        }
+    }
+    return rawPath;
 }
