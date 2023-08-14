@@ -51,7 +51,7 @@ export function getComponentsPath(sourceFile: ts.SourceFile, rootPath: string, c
     if (!component) {
         return [];
     }
-    const decorator = component.modifiers?.find(m => ts.isDecorator(m)) as ts.Decorator;
+    const decorator = getClassDecorator(component, "Component");
     if (!decorator) {
         return [];
     }
@@ -82,7 +82,12 @@ function isVueClassStatement(statement: ts.Statement): boolean {
     return false;
 }
 
-/** 过滤出需要的属性 */
+/** 获取类的装饰器 */
+function getClassDecorator(component: ts.ClassDeclaration, name: string): ts.Decorator | undefined {
+    return component.modifiers?.find(m => ts.isDecorator(m) && getDecoratorName(m) === name) as ts.Decorator;
+}
+
+/** 过滤出指定装饰器的属性 */
 function filterProperty(members: ts.NodeArray<ts.ClassElement>, decoratorName: string) {
     return members.filter(member => {
         if (ts.isPropertyDeclaration(member)) {
@@ -92,19 +97,23 @@ function filterProperty(members: ts.NodeArray<ts.ClassElement>, decoratorName: s
                 .filter(modifier => ts.isDecorator(modifier)) as ts.Decorator[];
             if (decorators.length) {
                 // 是否存在与提供的名称相等的装饰器
-                return decorators.some(decorator => {
-                    if (decorator.expression.kind === ts.SyntaxKind.CallExpression) {
-                        const callExpression = decorator.expression as ts.CallExpression;
-                        if (callExpression.expression.kind === ts.SyntaxKind.Identifier) {
-                            const identifier = callExpression.expression as ts.Identifier;
-                            return identifier.escapedText === decoratorName;
-                        }
-                    }
-                });
+                return decorators.some(decorator => getDecoratorName(decorator) === decoratorName);
             }
         }
         return false;
     }) as ts.PropertyDeclaration[];
+}
+
+/** 获取装饰器的名称 */
+function getDecoratorName(decorator: ts.Decorator): string {
+    if (ts.isCallExpression(decorator.expression)) {
+        const callExpression = decorator.expression;
+        if (ts.isIdentifier(callExpression.expression)) {
+            const identifier = callExpression.expression;
+            return identifier.escapedText.toString();
+        }
+    }
+    return "";
 }
 
 function getVueProp(property: ts.PropertyDeclaration): VueProp {
