@@ -54,7 +54,7 @@ export class ComponentManager {
     public getHtmlDocument(document: TextDocument) {
         if (this.cacheHtmlDocument.has(document.uri)) {
             // eslint-disable-next-line no-console
-            console.log("cacheHtmlDocument");
+            console.log("cacheHtmlDocument:", document.uri.slice(document.uri.lastIndexOf("/") + 1));
             return this.cacheHtmlDocument.get(document.uri) as HTMLDocument;
         }
         const htmlDocument = this.htmlLanguageService.parseHTMLDocument(document);
@@ -80,7 +80,7 @@ export class ComponentManager {
         // 从缓存中获取
         if (this.cacheVueComponent.has(cacheKey)) {
             // eslint-disable-next-line no-console
-            console.log("cacheVueComponent");
+            console.log("cacheVueComponent:", name);
             return this.cacheVueComponent.get(cacheKey) as VueComponent;
         }
         let document = this.documents.get(uri);
@@ -155,7 +155,7 @@ export class ComponentManager {
     private getSourceFile(document: TextDocument): ts.SourceFile {
         if (this.cacheSourceFile.has(document.uri)) {
             // eslint-disable-next-line no-console
-            console.log("cacheSourceFile");
+            console.log("cacheSourceFile:", document.uri.slice(document.uri.lastIndexOf("/") + 1));
             return this.cacheSourceFile.get(document.uri) as ts.SourceFile;
         }
         // 从 documents 获取
