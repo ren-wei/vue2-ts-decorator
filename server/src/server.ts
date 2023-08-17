@@ -61,6 +61,8 @@ connection.onInitialize((params: InitializeParams) => {
 });
 
 connection.onInitialized(async() => {
+    // eslint-disable-next-line no-console
+    console.log("onInitialized");
     if (hasConfigurationCapability) {
         // Register for all configuration changes.
         connection.client.register(DidChangeConfigurationNotification.type, undefined);
@@ -75,6 +77,8 @@ connection.onInitialized(async() => {
 
     connection.onHover(
         (params: HoverParams) => {
+            // eslint-disable-next-line no-console
+            console.log("onHover");
             const document = documents.get(params.textDocument.uri);
             if (document) {
                 return vueLanguageService.doHover(document, params.position);
@@ -84,6 +88,8 @@ connection.onInitialized(async() => {
 
     connection.onCompletion(
         (params: TextDocumentPositionParams): CompletionItem[] => {
+            // eslint-disable-next-line no-console
+            console.log("onCompletion");
             const document = documents.get(params.textDocument.uri);
             if (document) {
                 return vueLanguageService.doComplete(document, params.position);
@@ -94,6 +100,8 @@ connection.onInitialized(async() => {
 
     connection.onDefinition(
         (params: DefinitionParams): Definition => {
+            // eslint-disable-next-line no-console
+            console.log("onDefinition");
             const document = documents.get(params.textDocument.uri);
             if (document) {
                 return vueLanguageService.doDefinition(document, params.position);

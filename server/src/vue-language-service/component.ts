@@ -53,6 +53,8 @@ export class ComponentManager {
 
     public getHtmlDocument(document: TextDocument) {
         if (this.cacheHtmlDocument.has(document.uri)) {
+            // eslint-disable-next-line no-console
+            console.log("cacheHtmlDocument");
             return this.cacheHtmlDocument.get(document.uri) as HTMLDocument;
         }
         const htmlDocument = this.htmlLanguageService.parseHTMLDocument(document);
@@ -77,6 +79,8 @@ export class ComponentManager {
         }
         // 从缓存中获取
         if (this.cacheVueComponent.has(cacheKey)) {
+            // eslint-disable-next-line no-console
+            console.log("cacheVueComponent");
             return this.cacheVueComponent.get(cacheKey) as VueComponent;
         }
         let document = this.documents.get(uri);
@@ -91,6 +95,8 @@ export class ComponentManager {
                     document = TextDocument.create(uri, "typescript", 1, content);
                 }
             } else {
+                // eslint-disable-next-line no-console
+                console.warn("(getVueComponent) file not exist:", absolutePath);
                 return null;
             }
         }
@@ -102,11 +108,14 @@ export class ComponentManager {
             } else {
                 component = parseLibraryFile(sourceFile, name);
             }
+            component.name = name;
             if (component) {
                 this.cacheVueComponent.set(cacheKey, component);
             }
             return component;
         }
+        // eslint-disable-next-line no-console
+        console.warn("(getVueComponent) sourceFile is null:", uri);
         return null;
     }
 
@@ -117,6 +126,8 @@ export class ComponentManager {
         }
         const document = this.documents.get(uri);
         if (!document) {
+            // eslint-disable-next-line no-console
+            console.warn("(getComponents) uri not found in documents:", uri);
             return [];
         }
         const rootPath = this.getRootPath(document.uri) || ".";
@@ -126,6 +137,8 @@ export class ComponentManager {
             if (component) {
                 return component;
             } else {
+                // eslint-disable-next-line no-console
+                console.warn("component not found:", name);
                 return {
                     uri: getUri(path, uri),
                     name,
@@ -141,6 +154,8 @@ export class ComponentManager {
 
     private getSourceFile(document: TextDocument): ts.SourceFile {
         if (this.cacheSourceFile.has(document.uri)) {
+            // eslint-disable-next-line no-console
+            console.log("cacheSourceFile");
             return this.cacheSourceFile.get(document.uri) as ts.SourceFile;
         }
         // 从 documents 获取
@@ -171,7 +186,11 @@ export class ComponentManager {
             const content = readFileSync(tsConfigPath, { encoding: "utf8" });
             try {
                 return JSON.parse(content).compilerOptions || {};
-            } catch {
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.error("[ERROR] tsconfig.json:");
+                // eslint-disable-next-line no-console
+                console.error(e);
                 return {};
             }
         }

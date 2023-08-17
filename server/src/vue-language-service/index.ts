@@ -31,6 +31,10 @@ export default class VueLanguageService {
         const components = this.componentManager.getComponents(document.uri);
         const component = components.find(v => v.name === tag);
         if (component) {
+            // eslint-disable-next-line no-console
+            console.log("result:", component);
+            // eslint-disable-next-line no-console
+            console.log("");
             const range = {
                 start: document.positionAt(tokenOffset),
                 end: document.positionAt(tokenOffset + tag.length),
@@ -80,6 +84,10 @@ export default class VueLanguageService {
                     break;
             }
         }
+        // eslint-disable-next-line no-console
+        console.log("Not matched:", tag, type);
+        // eslint-disable-next-line no-console
+        console.log("");
         return null;
     }
 
@@ -251,11 +259,11 @@ interface VueTokenTypeResult {
 
 enum VueTokenType {
     /** 组件名称 */
-    ComponentName,
+    ComponentName = "ComponentName",
     /** 属性名 */
-    AttributeName,
+    AttributeName = "AttributeName",
     /** 可能是组件名称的内容 */
-    ComponentNameContent,
+    ComponentNameContent = "ComponentNameContent",
     /** 其他 */
-    Other,
+    Other = "Other",
 }
